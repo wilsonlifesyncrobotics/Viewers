@@ -11,6 +11,7 @@ import NavigationComponent from './components/NavigationComponent/NavigationComp
 import TrackingStatus from './components/TrackingStatus/TrackingStatus';
 import ViewportColorbarsContainer from './components/ViewportColorbar';
 import AdvancedRenderingControls from './components/AdvancedRenderingControls';
+import ModelUploadButton from './components/ModelUpload/ModelUploadButton';
 
 const getDisabledState = (disabledText?: string) => ({
   disabled: true,
@@ -18,6 +19,8 @@ const getDisabledState = (disabledText?: string) => ({
 });
 
 export default function getToolbarModule({ servicesManager, extensionManager }: withAppTypes) {
+  console.log('🔧 [getToolbarModule] Initializing toolbar module');
+
   const {
     toolGroupService,
     toolbarService,
@@ -28,6 +31,13 @@ export default function getToolbarModule({ servicesManager, extensionManager }: 
     viewportGridService,
     segmentationService,
   } = servicesManager.services;
+
+  console.log('🔧 [getToolbarModule] Services available:', {
+    toolGroupService: !!toolGroupService,
+    toolbarService: !!toolbarService,
+    syncGroupService: !!syncGroupService,
+    cornerstoneViewportService: !!cornerstoneViewportService,
+  });
 
   return [
     {
@@ -550,7 +560,20 @@ export default function getToolbarModule({ servicesManager, extensionManager }: 
         };
       },
     },
-  ];
+    {
+      name: 'ohif.modelUploadButton',
+      defaultComponent: ModelUploadButton,
+    },
+  ].map((item, index) => {
+    if (item.name === 'ohif.modelUploadButton') {
+      console.log('🔧 [getToolbarModule] Registered ModelUploadButton:', {
+        name: item.name,
+        component: !!item.defaultComponent,
+        componentName: item.defaultComponent?.name,
+      });
+    }
+    return item;
+  });
 }
 
 function _evaluateToggle({

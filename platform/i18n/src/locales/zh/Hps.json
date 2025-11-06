@@ -1,6 +1,7 @@
 {
   "MPR": "多平面重建",
   "3D four up": "三维四窗",
+  "3D four mesh": "三维四网格",
   "Frame View": "单帧视图",
   "Frame view for the active series": "当前序列的单帧视图",
   "3D main": "三维主视图",

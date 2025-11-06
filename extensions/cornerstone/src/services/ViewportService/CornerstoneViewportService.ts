@@ -93,6 +93,88 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
   viewportDisplaySets: unknown;
 
   /**
+   * Helper method to ensure maximum samples per ray is safe for 3D volume rendering
+   * This prevents "steps required exceeds maximum" errors
+   * @param viewport - The viewport to fix
+   */
+  private _ensureSafeMaximumSamplesPerRay(viewport: Types.IVolumeViewport): void {
+    // Apply to both 3D volume and orthographic (MPR) viewports
+    if (viewport.type !== csEnums.ViewportType.VOLUME_3D &&
+        viewport.type !== csEnums.ViewportType.ORTHOGRAPHIC) {
+      return;
+    }
+
+    // console.log(`[VolumeRenderer] Checking viewport type: ${viewport.type}, id: ${viewport.id}`);
+
+    try {
+      const actors = viewport.getActors();
+      if (!actors || actors.length === 0) {
+        // console.warn('[VolumeRenderer] No actors available yet for viewport', viewport.id);
+        return;
+      }
+
+      const { actor } = actors[0];
+      const mapper = actor.getMapper();
+
+      if (!mapper) {
+        // console.warn('[VolumeRenderer] No mapper available for viewport', viewport.id);
+        return;
+      }
+
+      // Get the input data to calculate proper sample distance
+      const image = mapper.getInputData?.();
+      if (!image) {
+        // console.warn('[VolumeRenderer] No input data available for mapper');
+        return;
+      }
+
+      const dims = image.getDimensions();
+      const spacing = image.getSpacing();
+
+      // Calculate the diagonal of the volume
+      const spatialDiagonal = Math.sqrt(
+        (dims[0] * spacing[0]) ** 2 +
+        (dims[1] * spacing[1]) ** 2 +
+        (dims[2] * spacing[2]) ** 2
+      );
+
+      // Get current maximum samples (default is 4000)
+      const maxSamples = mapper.getMaximumSamplesPerRay?.() || 4000;
+
+      // Calculate required sample distance to stay under maxSamples
+      // Formula: steps = spatialDiagonal / sampleDistance
+      // We want: steps < maxSamples, so sampleDistance > spatialDiagonal / maxSamples
+      // Add 20% safety margin
+      const minRequiredDistance = (spatialDiagonal / (maxSamples * 0.8));
+
+      // Get current sample distance
+      const currentDistance = mapper.getSampleDistance?.();
+
+      // console.log(`[VolumeRenderer] Viewport ${viewport.id}:`, {
+      //   spatialDiagonal: spatialDiagonal.toFixed(2),
+      //   maxSamples,
+      //   currentDistance: currentDistance?.toFixed(4),
+      //   minRequiredDistance: minRequiredDistance.toFixed(4),
+      //   estimatedSteps: (spatialDiagonal / (currentDistance || minRequiredDistance)).toFixed(0)
+      // });
+
+      // If current distance is too small (would cause too many steps), increase it
+      if (!currentDistance || currentDistance < minRequiredDistance) {
+        // console.log(`[VolumeRenderer] Adjusting sample distance: ${currentDistance?.toFixed(4)} → ${minRequiredDistance.toFixed(4)}`);
+        mapper.setSampleDistance(minRequiredDistance);
+
+        // Verify it was set
+        const newDistance = mapper.getSampleDistance?.();
+        const newSteps = spatialDiagonal / newDistance;
+        // console.log(`[VolumeRenderer] New sample distance: ${newDistance?.toFixed(4)}, estimated steps: ${newSteps.toFixed(0)}`);
+      }
+
+    } catch (error) {
+      console.error('Failed to adjust volume rendering parameters:', error);
+    }
+  }
+
+  /**
    * Adds the HTML element to the viewportService
    * @param {*} viewportId
    * @param {*} elementRef
@@ -996,6 +1078,34 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
 
     await viewport.setVolumes(volumeInputArray);
 
+    // For 3D volume and MPR (orthographic) viewports, aggressively fix maximum samples per ray
+    const isVolumeViewport = viewport.type === csEnums.ViewportType.VOLUME_3D ||
+                             viewport.type === csEnums.ViewportType.ORTHOGRAPHIC;
+
+    if (isVolumeViewport) {
+      // console.log(`[VolumeRenderer] Installing hooks for viewport type: ${viewport.type}, id: ${viewport.id}`);
+      // First, patch the render method to always ensure safe maximum samples
+      const originalRender = viewport.render.bind(viewport);
+      viewport.render = () => {
+        this._ensureSafeMaximumSamplesPerRay(viewport);
+        return originalRender();
+      };
+
+      // Also patch setProperties to fix it right after properties are set
+      const originalSetProperties = viewport.setProperties.bind(viewport);
+      viewport.setProperties = (properties, volumeId?) => {
+        const result = originalSetProperties(properties, volumeId);
+        // If preset was set, immediately fix the maximum samples
+        if (properties && properties.preset) {
+          this._ensureSafeMaximumSamplesPerRay(viewport);
+        }
+        return result;
+      };
+
+      // Fix it immediately for the first time
+      this._ensureSafeMaximumSamplesPerRay(viewport);
+    }
+
     if (overlayProcessingResults?.length) {
       overlayProcessingResults.forEach(({ addOverlayFn }) => {
         if (addOverlayFn) {
@@ -1010,6 +1120,13 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
         // seems like a hack but we need the actor to be ready first before
         // we set the properties
         viewport.setProperties(properties, volumeId);
+
+        // After setting properties (especially preset), ensure maximum samples per ray is safe
+        if (properties.preset) {
+          // console.log(`[VolumeRenderer] Preset applied in setTimeout: ${properties.preset}, viewport: ${viewport.id}`);
+          this._ensureSafeMaximumSamplesPerRay(viewport);
+        }
+
         viewport.render();
       }, 0);
     });
@@ -1025,6 +1142,10 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
         });
       }
     }
+
+    // Final fix to ensure maximum samples per ray is safe after all presentations are applied
+    // console.log(`[VolumeRenderer] Final fix after all presentations for viewport: ${viewport.id}`);
+    this._ensureSafeMaximumSamplesPerRay(viewport);
 
     this._broadcastEvent(this.EVENTS.VIEWPORT_VOLUMES_CHANGED, {
       viewportInfo,
@@ -1295,6 +1416,10 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
       } else {
         viewport.setProperties(properties);
       }
+
+      // After setting properties, ensure maximum samples per ray is safe for 3D volume rendering
+      // console.log(`[VolumeRenderer] Fixing after LUT presentation for viewport: ${viewport.id}`);
+      this._ensureSafeMaximumSamplesPerRay(viewport);
     } else {
       viewport.setProperties(properties);
     }

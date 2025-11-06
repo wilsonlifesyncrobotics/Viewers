@@ -632,6 +632,17 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    id: 'ModelUpload',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'Upload',
+      label: i18n.t('Buttons:Upload 3D Models'),
+      tooltip: i18n.t('Buttons:Upload 3D Models (OBJ, STL, PLY)'),
+      commands: 'showModelUploadModal',
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
     id: 'Layout',
     uiType: 'ohif.layoutSelector',
     props: {

@@ -21,6 +21,7 @@ import SegmentationService from './services/SegmentationService';
 import CornerstoneCacheService from './services/CornerstoneCacheService';
 import CornerstoneViewportService from './services/ViewportService/CornerstoneViewportService';
 import ColorbarService from './services/ColorbarService';
+import ModelStateService from './modelStateService';
 import * as CornerstoneExtensionTypes from './types';
 
 import { toolNames } from './initCornerstoneTools';
@@ -59,6 +60,10 @@ import { useMeasurementTracking } from './hooks/useMeasurementTracking';
 import { setUpSegmentationEventHandlers } from './utils/setUpSegmentationEventHandlers';
 export * from './components';
 
+import ViewportStateService from './viewportStateService';
+import ViewportStatePanel from './viewportStatePanel';
+
+
 const { imageRetrieveMetadataProvider } = cornerstone.utilities;
 
 const Component = React.lazy(() => {
@@ -82,7 +87,7 @@ const stackRetrieveOptions = {
   },
 };
 
-const unsubscriptions = [];
+export const unsubscriptions = [];
 /**
  *
  */
@@ -169,11 +174,25 @@ const cornerstoneExtension: Types.Extensions.Extension = {
     servicesManager.registerService(SegmentationService.REGISTRATION);
     servicesManager.registerService(CornerstoneCacheService.REGISTRATION);
     servicesManager.registerService(ColorbarService.REGISTRATION);
+    servicesManager.registerService(ModelStateService.REGISTRATION);
 
     const { syncGroupService } = servicesManager.services;
     syncGroupService.registerCustomSynchronizer('frameview', createFrameViewSynchronizer);
 
     await init.call(this, props);
+
+    // 👇 ADD YOUR CODE HERE
+    if (process.env.NODE_ENV === 'development') {
+      window.cornerstone3D = {
+        core: cornerstone,
+        tools: cornerstoneTools,
+      };
+      console.info('✅ Cornerstone3D exposed to window.cornerstone3D');
+    }
+    // 👆 END OF YOUR CODE
+
+    servicesManager.registerService(ViewportStateService.REGISTRATION);
+
   },
   getToolbarModule,
   getHangingProtocolModule,
@@ -236,6 +255,9 @@ const cornerstoneExtension: Types.Extensions.Extension = {
   },
   getSopClassHandlerModule,
 };
+
+
+
 
 export type { PublicViewportOptions };
 export {

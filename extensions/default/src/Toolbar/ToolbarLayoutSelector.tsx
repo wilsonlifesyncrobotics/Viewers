@@ -72,6 +72,13 @@ function ToolbarLayoutSelectorWithServices({
           },
         },
         {
+          title: '3D four mesh',
+          icon: 'layout-advanced-3d-four-up',
+          commandOptions: {
+            protocolId: 'fourUpMesh',
+          },
+        },
+        {
           title: '3D main',
           icon: 'layout-three-row',
           commandOptions: {

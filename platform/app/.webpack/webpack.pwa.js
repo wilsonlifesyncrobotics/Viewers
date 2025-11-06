@@ -79,6 +79,16 @@ module.exports = (env, argv) => {
         // Hoisted Yarn Workspace Modules
         path.resolve(__dirname, '../../../node_modules'),
         SRC_DIR,
+        path.resolve(__dirname, 'extensions/performance-stats/node_modules'),
+        path.resolve(__dirname, 'extensions/performance-stats/node_modules'),
+        path.resolve(__dirname, 'extensions/performance-stats/node_modules'),
+        path.resolve(__dirname, 'extensions/performance-stats/node_modules'),
+        path.resolve(__dirname, 'extensions/performance-stats/node_modules'),
+        path.resolve(__dirname, 'extensions/performance-stats/node_modules'),
+        path.resolve(__dirname, 'extensions/performance-stats/node_modules'),
+        path.resolve(__dirname, 'extensions/performance-stats/node_modules'),
+        path.resolve(__dirname, 'extensions/performance-stats/node_modules'),
+        path.resolve(__dirname, 'extensions/performance-stats/node_modules'),
       ],
     },
     plugins: [
@@ -147,7 +157,12 @@ module.exports = (env, argv) => {
       // compress: true,
       // http2: true,
       // https: true,
-      open: true,
+      // open: true,
+      open: {
+        app: {
+          name: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        },
+      },
       port: OHIF_PORT,
       client: {
         overlay: { errors: true, warnings: false },
@@ -182,16 +197,17 @@ module.exports = (env, argv) => {
   });
 
   if (hasProxy) {
-    mergedConfig.devServer.proxy = mergedConfig.devServer.proxy || {};
-    mergedConfig.devServer.proxy = {
-      [PROXY_TARGET]: {
-        target: PROXY_DOMAIN,
+    mergedConfig.devServer.proxy = [
+      {
+        context: ['/pacs/dicom-web', '/pacs/wado'], // Multiple paths
+        target: 'http://localhost:8042',
         changeOrigin: true,
         pathRewrite: {
-          [`^${PROXY_PATH_REWRITE_FROM}`]: PROXY_PATH_REWRITE_TO,
+          '^/pacs/dicom-web': '/dicom-web',
+          '^/pacs/wado': '/wado',
         },
       },
-    };
+    ];
   }
 
   if (isProdBuild) {

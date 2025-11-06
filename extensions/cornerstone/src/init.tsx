@@ -1,5 +1,6 @@
 import OHIF, { errorHandler } from '@ohif/core';
 import React from 'react';
+import { unsubscriptions } from './index';
 
 import * as cornerstone from '@cornerstonejs/core';
 import * as cornerstoneTools from '@cornerstonejs/tools';
@@ -100,6 +101,7 @@ export default async function init({
     colorbarService,
     displaySetService,
     toolbarService,
+    toolGroupService,
   } = servicesManager.services;
 
   toolbarService.registerEventForToolbarUpdate(colorbarService, [
@@ -107,6 +109,7 @@ export default async function init({
   ]);
 
   window.services = servicesManager.services;
+  window.servicesManager = servicesManager;
   window.extensionManager = extensionManager;
   window.commandsManager = commandsManager;
 
@@ -272,6 +275,33 @@ export default async function init({
       commandsManager.runCommand('resetCrosshairs', { viewportId });
     });
 
+    // Listen for camera changes (pan, zoom, rotate, restore) and update crosshairs
+    // This handles cases like viewport state restoration where camera changes
+    // but VIEWPORT_DATA_CHANGED event is not triggered
+    let cameraModifiedTimeout;
+    element.addEventListener(EVENTS.CAMERA_MODIFIED, evt => {
+      const { element } = evt.detail;
+      const enabledElement = getEnabledElement(element);
+      if (!enabledElement) {
+        return;
+      }
+      const { viewportId } = enabledElement;
+
+      // Debounce to avoid excessive updates during continuous pan/zoom
+      clearTimeout(cameraModifiedTimeout);
+      cameraModifiedTimeout = setTimeout(() => {
+        const toolGroup = toolGroupService.getToolGroupForViewport(viewportId);
+        if (!toolGroup || !toolGroup.hasTool('Crosshairs')) {
+          return;
+        }
+
+        // Only reset if crosshairs are currently the active tool
+        if (toolGroup.getActivePrimaryMouseButtonTool() === 'Crosshairs') {
+          commandsManager.runCommand('resetCrosshairs', { viewportId });
+        }
+      }, 100); // 100ms debounce
+    });
+
     // limitation: currently supporting only volume viewports with fusion
     if (viewport.type !== cornerstone.Enums.ViewportType.ORTHOGRAPHIC) {
       return;
@@ -279,6 +309,27 @@ export default async function init({
   }
 
   eventTarget.addEventListener(EVENTS.ELEMENT_ENABLED, elementEnabledHandler.bind(null));
+
+  // Listen for viewport data changes and reset crosshairs
+  const { unsubscribe: unsubscribeViewportDataChanged } =
+    cornerstoneViewportService.subscribe(
+      cornerstoneViewportService.EVENTS.VIEWPORT_DATA_CHANGED,
+      (props: { viewportId: string }) => {
+        const { viewportId } = props;
+        const toolGroup = toolGroupService.getToolGroupForViewport(viewportId);
+        if (!toolGroup || !toolGroup.hasTool('Crosshairs')) {
+          return;
+        }
+
+        // Check if crosshairs are currently the active primary tool
+        if (toolGroup.getActivePrimaryMouseButtonTool() === 'Crosshairs') {
+          commandsManager.runCommand('resetCrosshairs', { viewportId });
+        }
+      }
+    );
+
+  // Clean up on mode exit
+  unsubscriptions.push(unsubscribeViewportDataChanged);
 
   colormaps.forEach(registerColormap);
 

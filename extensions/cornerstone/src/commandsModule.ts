@@ -43,6 +43,7 @@ import { SegmentationRepresentations } from '@cornerstonejs/tools/enums';
 import { isMeasurementWithinViewport } from './utils/isMeasurementWithinViewport';
 import { getCenterExtent } from './utils/getCenterExtent';
 import { EasingFunctionEnum } from './utils/transitions';
+import { ModelUpload } from './components/ModelUpload';
 
 const { DefaultHistoryMemo } = csUtils.HistoryMemo;
 const toggleSyncFunctions = {
@@ -118,6 +119,7 @@ function commandsModule({
     syncGroupService,
     segmentationService,
     displaySetService,
+    viewportStateService,
   } = servicesManager.services as AppTypes.Services;
 
   function _getActiveViewportEnabledElement() {
@@ -1322,6 +1324,45 @@ function commandsModule({
       viewport.setProperties({
         preset,
       });
+
+      // After setting preset, ensure sample distance is safe for volume rendering (3D and MPR)
+      // This prevents "steps required exceeds maximum" errors by adjusting the sample distance
+      const isVolumeViewport = viewport.type === CoreEnums.ViewportType.VOLUME_3D ||
+                               viewport.type === CoreEnums.ViewportType.ORTHOGRAPHIC;
+
+      if (isVolumeViewport) {
+        console.log(`[setViewportPreset] Processing viewport type: ${viewport.type}, preset: ${preset}`);
+        try {
+          const actors = viewport.getActors();
+          if (actors && actors.length > 0) {
+            const { actor } = actors[0];
+            const mapper = actor.getMapper();
+            if (mapper && mapper.setSampleDistance) {
+              const image = mapper.getInputData?.();
+              if (image) {
+                const dims = image.getDimensions();
+                const spacing = image.getSpacing();
+                const spatialDiagonal = Math.sqrt(
+                  (dims[0] * spacing[0]) ** 2 +
+                  (dims[1] * spacing[1]) ** 2 +
+                  (dims[2] * spacing[2]) ** 2
+                );
+                const maxSamples = mapper.getMaximumSamplesPerRay?.() || 4000;
+                const minRequiredDistance = (spatialDiagonal / (maxSamples * 0.8));
+                const currentDistance = mapper.getSampleDistance?.();
+
+                if (!currentDistance || currentDistance < minRequiredDistance) {
+                  console.log(`[setViewportPreset] Adjusting sample distance: ${currentDistance?.toFixed(4)} → ${minRequiredDistance.toFixed(4)}`);
+                  mapper.setSampleDistance(minRequiredDistance);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to adjust sample distance after preset:', error);
+        }
+      }
+
       viewport.render();
     },
 
@@ -1333,6 +1374,9 @@ function commandsModule({
 
     setVolumeRenderingQulaity: ({ viewportId, volumeQuality }) => {
       const viewport = cornerstoneViewportService.getCornerstoneViewport(viewportId);
+
+      // console.log(`[setVolumeRenderingQuality] Viewport type: ${viewport.type}, quality: ${volumeQuality}, id: ${viewportId}`);
+
       const { actor } = viewport.getActors()[0];
       const mapper = actor.getMapper();
       const image = mapper.getInputData();
@@ -1342,11 +1386,19 @@ function commandsModule({
         vec3.fromValues(dims[0] * spacing[0], dims[1] * spacing[1], dims[2] * spacing[2])
       );
 
+      // Calculate desired sample distance based on quality
       let sampleDistance = spacing.reduce((a, b) => a + b) / 3.0;
       sampleDistance /= volumeQuality > 1 ? 0.5 * volumeQuality ** 2 : 1.0;
-      const samplesPerRay = spatialDiagonal / sampleDistance + 1;
-      mapper.setMaximumSamplesPerRay(samplesPerRay);
-      mapper.setSampleDistance(sampleDistance);
+
+      // Ensure sample distance is large enough to stay under the maximum samples limit
+      const maxSamples = mapper.getMaximumSamplesPerRay?.() || 4000;
+      const minRequiredDistance = (spatialDiagonal / (maxSamples * 0.8));
+
+      // Use the larger of the two (safer)
+      const safeSampleDistance = Math.max(sampleDistance, minRequiredDistance);
+
+      console.log(`[setVolumeRenderingQuality] Quality: ${volumeQuality}, desired: ${sampleDistance.toFixed(4)}, minRequired: ${minRequiredDistance.toFixed(4)}, final: ${safeSampleDistance.toFixed(4)}`);
+      mapper.setSampleDistance(safeSampleDistance);
       viewport.render();
     },
 
@@ -1916,6 +1968,26 @@ function commandsModule({
       tools.disabled = disabledTools;
       return tools;
     },
+    // Camera focal point logging for MPR viewports
+    enableCameraLogging: () => {
+      viewportStateService.enableCameraLogging();
+    },
+    disableCameraLogging: () => {
+      viewportStateService.disableCameraLogging();
+    },
+    toggleCameraLogging: () => {
+      viewportStateService.toggleCameraLogging();
+    },
+    getCameraFocalPoints: () => {
+      const focalPoints = viewportStateService.getCurrentFocalPoints();
+      // console.log('📸 Current Camera Focal Points:', focalPoints);
+      return focalPoints;
+    },
+    getCrosshairsToolCenter: () => {
+      const crosshairsData = viewportStateService.getCrosshairsToolCenter();
+      console.log('🎯 Crosshairs Tool Center:', crosshairsData);
+      return crosshairsData;
+    },
     toggleUseCenterSegmentIndex: ({ toggle }) => {
       let labelmapTools = getLabelmapTools({ toolGroupService });
       labelmapTools = labelmapTools.filter(tool => !tool.toolName.includes('Eraser'));
@@ -1925,6 +1997,86 @@ function commandsModule({
           useCenterSegmentIndex: toggle,
         };
       });
+    },
+    /**
+     * Opens a modal dialog with the 3D Model Upload interface
+     */
+    showModelUploadModal: () => {
+      // console.log('📦 [showModelUploadModal] Command executed');
+      // console.log('📦 [showModelUploadModal] ServicesManager:', !!servicesManager);
+
+      const { uiModalService, viewportGridService } = servicesManager.services;
+      console.log('📦 [showModelUploadModal] uiModalService available:', !!uiModalService);
+      console.log('📦 [showModelUploadModal] viewportGridService available:', !!viewportGridService);
+
+      if (!uiModalService) {
+        console.error('❌ [showModelUploadModal] uiModalService is not available!');
+        console.log('Available services:', Object.keys(servicesManager.services));
+        return;
+      }
+
+      // Get active viewport ID
+      const activeViewportId = viewportGridService?.getActiveViewportId?.();
+      // console.log('📦 [showModelUploadModal] Active viewport ID:', activeViewportId);
+
+      if (!activeViewportId) {
+        console.warn('⚠️ [showModelUploadModal] No active viewport found!');
+        console.log('📦 [showModelUploadModal] ViewportGridService state:', viewportGridService?.getState?.());
+      }
+
+      // Check viewport type and capabilities
+      const { cornerstoneViewportService } = servicesManager.services;
+      if (activeViewportId && cornerstoneViewportService) {
+        const viewport = cornerstoneViewportService.getCornerstoneViewport(activeViewportId);
+        // console.log('📦 [showModelUploadModal] Viewport info:', {
+        //   id: activeViewportId,
+        //   type: viewport?.type,
+        //   hasViewport: !!viewport,
+        // });
+
+        // Check if it's a 3D-capable viewport
+        const is3DCapable = viewport?.type === 'volume3d' || viewport?.type === 'VOLUME_3D';
+        // console.log('📦 [showModelUploadModal] Viewport 3D capable:', is3DCapable);
+
+        if (!is3DCapable) {
+          console.warn('⚠️ [showModelUploadModal] Current viewport is NOT 3D capable!');
+          console.warn('⚠️ [showModelUploadModal] Viewport type:', viewport?.type);
+          console.warn('⚠️ [showModelUploadModal] 3D models require a Volume3D viewport');
+          console.warn('⚠️ [showModelUploadModal] Consider switching to a 3D view first');
+        }
+      }
+
+      console.log('📦 [showModelUploadModal] ModelUpload component:', !!ModelUpload);
+      console.log('📦 [showModelUploadModal] Opening modal with props:', {
+        viewportId: activeViewportId,
+        hasServicesManager: !!servicesManager,
+        hasCommandsManager: !!commandsManager,
+      });
+
+      try {
+        uiModalService.show({
+          content: ModelUpload,
+          title: 'Upload 3D Models',
+          contentProps: {
+            viewportId: activeViewportId || 'default',
+            servicesManager,
+            commandsManager,
+            onComplete: () => {
+              console.log('✅ [showModelUploadModal] Upload completed');
+              uiModalService.hide();
+            },
+            onStarted: () => {
+              console.log('📦 [showModelUploadModal] Upload started');
+            },
+          },
+          containerClassName: 'max-w-4xl p-4',
+        });
+        // console.log('✅ [showModelUploadModal] Modal.show() called successfully');
+        // console.log('📦 [showModelUploadModal] Modal should now be visible in DOM');
+      } catch (error) {
+        console.error('❌ [showModelUploadModal] Error showing modal:', error);
+        console.error('❌ [showModelUploadModal] Error stack:', error.stack);
+      }
     },
     _handlePreviewAction: action => {
       const { viewport } = _getActiveViewportEnabledElement();
@@ -2531,7 +2683,50 @@ function commandsModule({
     toggleSegmentLabel: actions.toggleSegmentLabel,
     jumpToMeasurementViewport: actions.jumpToMeasurementViewport,
     initializeSegmentLabelTool: actions.initializeSegmentLabelTool,
+    enableCameraLogging: {
+      commandFn: actions.enableCameraLogging,
+      storeContexts: [],
+      options: {},
+    },
+    disableCameraLogging: {
+      commandFn: actions.disableCameraLogging,
+      storeContexts: [],
+      options: {},
+    },
+    toggleCameraLogging: {
+      commandFn: actions.toggleCameraLogging,
+      storeContexts: [],
+      options: {},
+    },
+    getCameraFocalPoints: {
+      commandFn: actions.getCameraFocalPoints,
+      storeContexts: [],
+      options: {},
+    },
+    getCrosshairsToolCenter: {
+      commandFn: actions.getCrosshairsToolCenter,
+      storeContexts: [],
+      options: {},
+    },
+    showModelUploadModal: {
+      commandFn: actions.showModelUploadModal,
+      storeContexts: [],
+      options: {},
+    },
   };
+
+  console.log('📦 [commandsModule] Total commands registered:', Object.keys(definitions).length);
+  console.log('📦 [commandsModule] showModelUploadModal registered:', !!definitions.showModelUploadModal);
+
+  if (definitions.showModelUploadModal) {
+    console.log('✅ [commandsModule] showModelUploadModal command definition:', {
+      hasCommandFn: !!definitions.showModelUploadModal.commandFn,
+      storeContexts: definitions.showModelUploadModal.storeContexts,
+      options: definitions.showModelUploadModal.options,
+    });
+  } else {
+    console.error('❌ [commandsModule] showModelUploadModal command NOT FOUND in definitions!');
+  }
 
   return {
     actions,
