@@ -153,6 +153,54 @@ function commandsModule({
       cornerstoneTools.annotation.selection.setAnnotationSelected(annotationUID, true);
       const { metadata } = measurement;
 
+      // Special handling for FiducialMarker - jump directly to position
+      if (measurement.toolName === 'FiducialMarker') {
+        console.log('🎯 FiducialMarker clicked - Jumping to fiducial position');
+
+        // Get the fiducial's world position
+        const annotation = cornerstoneTools.annotation.state.getAnnotation(annotationUID);
+        if (annotation?.data?.handles?.points?.[0]) {
+          const fiducialWorldPosition = annotation.data.handles.points[0];
+          console.log('📍 Fiducial world position:', fiducialWorldPosition);
+
+          // Move all viewports' cameras to the fiducial position
+          const { viewports } = viewportGridService.getState();
+          const viewportIds = Array.from(viewports.keys());
+          viewportIds.forEach(vpId => {
+            const viewport = cornerstoneViewportService.getCornerstoneViewport(vpId);
+            if (viewport) {
+              const camera = viewport.getCamera();
+              const { position: cameraPosition, focalPoint: cameraFocalPoint } = camera;
+
+              // Calculate new camera position maintaining the same viewing direction
+              const viewDirection = vec3.sub(vec3.create(), cameraPosition, cameraFocalPoint);
+              const newPosition = vec3.add(vec3.create(), fiducialWorldPosition, viewDirection);
+
+              viewport.setCamera({
+                focalPoint: fiducialWorldPosition,
+                position: newPosition as any
+              });
+              viewport.render();
+            }
+          });
+
+          // Move crosshairs to fiducial position
+          const toolGroupIds = toolGroupService.getToolGroupIds();
+          toolGroupIds.forEach(toolGroupId => {
+            const toolGroup = toolGroupService.getToolGroup(toolGroupId);
+            const crosshairInstance = toolGroup?.getToolInstance?.('Crosshairs');
+
+            if (crosshairInstance && typeof crosshairInstance.setToolCenter === 'function') {
+              console.log(`🎯 Moving crosshairs in tool group ${toolGroupId} to fiducial position`);
+              crosshairInstance.setToolCenter(fiducialWorldPosition, false);
+            }
+          });
+        } else {
+          console.warn('⚠️ Could not find fiducial position in annotation data');
+        }
+        return;
+      }
+
       const activeViewportId = viewportGridService.getActiveViewportId();
       // Finds the best viewport to jump to for showing the annotation view reference
       // This may be different from active if there is a viewport already showing the display set.
