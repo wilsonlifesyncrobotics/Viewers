@@ -241,6 +241,7 @@ export const toolbarSections = {
     'EllipticalROI',
     'RectangleROI',
     'CircleROI',
+    'FiducialMarker',
     'PlanarFreehandROI',
     'SplineROI',
     'LivewireContour',

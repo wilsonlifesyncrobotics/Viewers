@@ -11,6 +11,7 @@ import RectangleROI from './RectangleROI';
 import SplineROI from './SplineROI';
 import LivewireContour from './LivewireContour';
 import Probe from './Probe';
+import FiducialMarker from './FiducialMarker';
 import UltrasoundDirectional from './UltrasoundDirectional';
 import SegmentBidirectional from './SegmentBidirectional';
 import UltrasoundPleuraBLine from './UltrasoundPleuraBLine';
@@ -235,6 +236,23 @@ const measurementServiceMappingsFactory = (
       toAnnotation: Probe.toAnnotation,
       toMeasurement: csToolsAnnotation =>
         Probe.toMeasurement(
+          csToolsAnnotation,
+          displaySetService,
+          cornerstoneViewportService,
+          _getValueTypeFromToolType,
+          customizationService
+        ),
+      matchingCriteria: [
+        {
+          valueType: MeasurementService.VALUE_TYPES.POINT,
+          points: 1,
+        },
+      ],
+    },
+    FiducialMarker: {
+      toAnnotation: FiducialMarker.toAnnotation,
+      toMeasurement: csToolsAnnotation =>
+        FiducialMarker.toMeasurement(
           csToolsAnnotation,
           displaySetService,
           cornerstoneViewportService,

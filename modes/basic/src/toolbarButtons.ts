@@ -330,6 +330,17 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    id: 'FiducialMarker',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'circle-notch',
+      label: i18n.t('Buttons:Add Fiducial'),
+      tooltip: i18n.t('Buttons:Place fiducial marker at current crosshair position'),
+      commands: 'addFiducialAtCrosshair',
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
     id: 'Cine',
     uiType: 'ohif.toolButton',
     props: {

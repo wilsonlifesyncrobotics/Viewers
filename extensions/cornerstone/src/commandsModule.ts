@@ -44,6 +44,7 @@ import { isMeasurementWithinViewport } from './utils/isMeasurementWithinViewport
 import { getCenterExtent } from './utils/getCenterExtent';
 import { EasingFunctionEnum } from './utils/transitions';
 import { ModelUpload } from './components/ModelUpload';
+import { addFiducialAtCrosshair } from './utils/addFiducialAtCrosshair';
 
 const { DefaultHistoryMemo } = csUtils.HistoryMemo;
 const toggleSyncFunctions = {
@@ -2165,6 +2166,30 @@ function commandsModule({
         window.__navigationController.setCenterToCurrentPosition();
       }
     },
+    /**
+     * Add fiducial marker at current crosshair position
+     */
+    addFiducialAtCrosshair: () => {
+      console.log('🎯 [addFiducialAtCrosshair] Adding fiducial marker');
+
+      const success = addFiducialAtCrosshair(servicesManager);
+
+      if (success) {
+        uiNotificationService?.show({
+          title: 'Fiducial Added',
+          message: 'Marker placed at crosshair position',
+          type: 'success',
+          duration: 2000,
+        });
+      } else {
+        uiNotificationService?.show({
+          title: 'Error',
+          message: 'Could not place fiducial marker',
+          type: 'error',
+          duration: 3000,
+        });
+      }
+    },
     _handlePreviewAction: action => {
       const { viewport } = _getActiveViewportEnabledElement();
       const previewTools = getPreviewTools({ toolGroupService });
@@ -2817,6 +2842,11 @@ function commandsModule({
     },
     setTrackingCenter: {
       commandFn: actions.setTrackingCenter,
+      storeContexts: [],
+      options: {},
+    },
+    addFiducialAtCrosshair: {
+      commandFn: actions.addFiducialAtCrosshair,
       storeContexts: [],
       options: {},
     },

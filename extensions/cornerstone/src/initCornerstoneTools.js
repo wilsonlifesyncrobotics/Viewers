@@ -47,6 +47,7 @@ import * as polySeg from '@cornerstonejs/polymorphic-segmentation';
 
 import CalibrationLineTool from './tools/CalibrationLineTool';
 import ImageOverlayViewerTool from './tools/ImageOverlayViewerTool';
+import FiducialMarkerTool from './tools/FiducialMarkerTool';
 
 export default function initCornerstoneTools(configuration = {}) {
   CrosshairsTool.isAnnotation = false;
@@ -73,6 +74,7 @@ export default function initCornerstoneTools(configuration = {}) {
   addTool(VolumeRotateTool);
   addTool(ZoomTool);
   addTool(ProbeTool);
+  addTool(FiducialMarkerTool);
   addTool(MIPJumpToClickTool);
   addTool(LengthTool);
   addTool(RectangleROITool);
@@ -135,6 +137,7 @@ const toolNames = {
   Length: LengthTool.toolName,
   DragProbe: DragProbeTool.toolName,
   Probe: ProbeTool.toolName,
+  FiducialMarker: FiducialMarkerTool.toolName,
   RectangleROI: RectangleROITool.toolName,
   RectangleROIThreshold: RectangleROIThresholdTool.toolName,
   EllipticalROI: EllipticalROITool.toolName,

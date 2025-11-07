@@ -37,6 +37,7 @@ const initMeasurementService = (
     SplineROI,
     LivewireContour,
     Probe,
+    FiducialMarker,
     UltrasoundDirectional,
     UltrasoundPleuraBLine,
     SegmentBidirectional,
@@ -94,6 +95,14 @@ const initMeasurementService = (
     CircleROI.matchingCriteria,
     CircleROI.toAnnotation,
     CircleROI.toMeasurement
+  );
+
+  measurementService.addMapping(
+    csTools3DVer1MeasurementSource,
+    'FiducialMarker',
+    FiducialMarker.matchingCriteria,
+    FiducialMarker.toAnnotation,
+    FiducialMarker.toMeasurement
   );
 
   measurementService.addMapping(

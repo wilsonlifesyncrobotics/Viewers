@@ -349,14 +349,15 @@ class NavigationController {
         if (annotations && annotations.length > 0) {
           const crosshairAnnotation = annotations[0];
 
-          // Try different possible locations for the center
-          if (crosshairAnnotation.data?.handles?.rotationPoints) {
-            crosshairPosition = crosshairAnnotation.data.handles.rotationPoints[0];
-            console.log(`📍 Found crosshair from rotationPoints in ${viewport.id}`);
-            break;
-          } else if (crosshairAnnotation.data?.handles?.toolCenter) {
+          // Get position from toolCenter (the actual crosshair center)
+          if (crosshairAnnotation.data?.handles?.toolCenter) {
             crosshairPosition = crosshairAnnotation.data.handles.toolCenter;
-            console.log(`📍 Found crosshair from toolCenter in ${viewport.id}`);
+            console.log(`📍 Found crosshair CENTER from toolCenter in ${viewport.id}`);
+            break;
+          } else if (crosshairAnnotation.data?.handles?.rotationPoints) {
+            // Fallback to rotationPoints (but this is a rotation handle, not the center!)
+            crosshairPosition = crosshairAnnotation.data.handles.rotationPoints[0];
+            console.log(`⚠️ Using rotationPoints[0] (rotation handle) in ${viewport.id}`);
             break;
           }
         }
