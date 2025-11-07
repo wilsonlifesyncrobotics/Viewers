@@ -2296,16 +2296,27 @@ function commandsModule({
         return;
       }
 
-      uiNotificationService?.show({
-        title: 'Measurements Loaded',
-        message: `Found ${savedData.measurementCount} saved measurements. Note: Annotations need to be manually recreated.`,
-        type: 'info',
-        duration: 5000,
-      });
-
       console.log('📋 Loaded measurement data:', savedData);
-      console.log('⚠️ Note: Automatic annotation recreation not yet implemented');
-      console.log('   You can manually recreate annotations using this data');
+
+      // Recreate annotations from JSON
+      const { recreateAnnotationsFromJSON } = await import('./utils/recreateAnnotationsFromJSON');
+      const recreatedCount = await recreateAnnotationsFromJSON(savedData, servicesManager);
+
+      if (recreatedCount > 0) {
+        uiNotificationService?.show({
+          title: 'Measurements Loaded',
+          message: `Successfully loaded ${recreatedCount} of ${savedData.measurementCount} measurements`,
+          type: 'success',
+          duration: 3000,
+        });
+      } else {
+        uiNotificationService?.show({
+          title: 'Load Failed',
+          message: 'Could not recreate annotations (check console for details)',
+          type: 'error',
+          duration: 3000,
+        });
+      }
     },
     _handlePreviewAction: action => {
       const { viewport } = _getActiveViewportEnabledElement();
