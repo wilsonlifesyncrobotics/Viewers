@@ -233,11 +233,180 @@ async function getMeasurementCSV(req, res) {
   }
 }
 
+/**
+ * Save measurements as JSON (same structure as CSV save)
+ */
+async function saveMeasurementJSON(req, res) {
+  try {
+    const { studyInstanceUID, seriesInstanceUID, filename, jsonContent } = req.body;
+
+    if (!studyInstanceUID || !seriesInstanceUID || !filename || !jsonContent) {
+      return res.status(400).json({
+        error: 'Missing required fields: studyInstanceUID, seriesInstanceUID, filename, jsonContent',
+      });
+    }
+
+    const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..', '..');
+    const surgicalCaseDir = path.join(workspaceRoot, 'surgical_case');
+    const studiesDir = path.join(surgicalCaseDir, 'studies');
+    const studyDir = path.join(studiesDir, studyInstanceUID);
+    const seriesDir = path.join(studyDir, seriesInstanceUID);
+
+    await fs.mkdir(seriesDir, { recursive: true });
+
+    const sanitizedFilename = path.basename(filename);
+    if (!sanitizedFilename.endsWith('.json')) {
+      return res.status(400).json({ error: 'Filename must end with .json' });
+    }
+
+    const filePath = path.join(seriesDir, sanitizedFilename);
+    await fs.writeFile(filePath, jsonContent, 'utf8');
+
+    res.json({
+      success: true,
+      filePath: filePath,
+      relativePath: `surgical_case/studies/${studyInstanceUID}/${seriesInstanceUID}/${sanitizedFilename}`,
+      message: 'JSON file saved successfully',
+    });
+  } catch (error) {
+    console.error('Error saving measurement JSON:', error);
+    res.status(500).json({
+      error: 'Failed to save JSON file',
+      message: error.message,
+    });
+  }
+}
+
+/**
+ * List JSON files for a study/series
+ */
+async function listMeasurementJSON(req, res) {
+  try {
+    const { studyInstanceUID, seriesInstanceUID } = req.query;
+
+    if (!studyInstanceUID) {
+      return res.status(400).json({
+        error: 'Missing required parameter: studyInstanceUID',
+      });
+    }
+
+    const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..', '..');
+    const surgicalCaseDir = path.join(workspaceRoot, 'surgical_case');
+    const studiesDir = path.join(surgicalCaseDir, 'studies');
+    const studyDir = path.join(studiesDir, studyInstanceUID);
+
+    try {
+      await fs.access(studyDir);
+    } catch {
+      return res.json({ files: [] });
+    }
+
+    let jsonFiles = [];
+
+    if (seriesInstanceUID) {
+      const seriesDir = path.join(studyDir, seriesInstanceUID);
+      try {
+        const files = await fs.readdir(seriesDir);
+        jsonFiles = files
+          .filter(f => f.endsWith('.json'))
+          .map(f => ({
+            filename: f,
+            path: path.join(seriesDir, f),
+            relativePath: `surgical_case/studies/${studyInstanceUID}/${seriesInstanceUID}/${f}`,
+            studyInstanceUID,
+            seriesInstanceUID,
+          }));
+      } catch {
+        // Series directory doesn't exist
+      }
+    } else {
+      const seriesDirs = await fs.readdir(studyDir);
+      for (const seriesUID of seriesDirs) {
+        const seriesDir = path.join(studyDir, seriesUID);
+        const stat = await fs.stat(seriesDir);
+        if (stat.isDirectory()) {
+          try {
+            const files = await fs.readdir(seriesDir);
+            const seriesJSONs = files
+              .filter(f => f.endsWith('.json'))
+              .map(f => ({
+                filename: f,
+                path: path.join(seriesDir, f),
+                relativePath: `surgical_case/studies/${studyInstanceUID}/${seriesUID}/${f}`,
+                studyInstanceUID,
+                seriesInstanceUID: seriesUID,
+              }));
+            jsonFiles.push(...seriesJSONs);
+          } catch {
+            // Skip if can't read directory
+          }
+        }
+      }
+    }
+
+    res.json({ files: jsonFiles });
+  } catch (error) {
+    console.error('Error listing JSON files:', error);
+    res.status(500).json({
+      error: 'Failed to list JSON files',
+      message: error.message,
+    });
+  }
+}
+
+/**
+ * Get specific JSON file content
+ */
+async function getMeasurementJSON(req, res) {
+  try {
+    const { studyInstanceUID, seriesInstanceUID, filename } = req.query;
+
+    if (!studyInstanceUID || !seriesInstanceUID || !filename) {
+      return res.status(400).json({
+        error: 'Missing required parameters: studyInstanceUID, seriesInstanceUID, filename',
+      });
+    }
+
+    const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..', '..');
+    const surgicalCaseDir = path.join(workspaceRoot, 'surgical_case');
+    const filePath = path.join(
+      surgicalCaseDir,
+      'studies',
+      studyInstanceUID,
+      seriesInstanceUID,
+      path.basename(filename)
+    );
+
+    try {
+      await fs.access(filePath);
+    } catch {
+      return res.status(404).json({ error: 'JSON file not found' });
+    }
+
+    const jsonContent = await fs.readFile(filePath, 'utf8');
+    res.json({
+      filename: path.basename(filename),
+      studyInstanceUID,
+      seriesInstanceUID,
+      jsonContent,
+    });
+  } catch (error) {
+    console.error('Error getting JSON file:', error);
+    res.status(500).json({
+      error: 'Failed to get JSON file',
+      message: error.message,
+    });
+  }
+}
+
 module.exports = {
   saveMeasurementCSV,
   saveMeasurementCSVRoute,
   listMeasurementCSV,
   getMeasurementCSV,
+  saveMeasurementJSON,
+  listMeasurementJSON,
+  getMeasurementJSON,
 };
 
 /**

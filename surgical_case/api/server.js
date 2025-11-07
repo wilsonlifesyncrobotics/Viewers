@@ -15,10 +15,13 @@
 
 const express = require('express');
 const path = require('path');
-const {
+const { 
   saveMeasurementCSVRoute,
   listMeasurementCSV,
-  getMeasurementCSV
+  getMeasurementCSV,
+  saveMeasurementJSON,
+  listMeasurementJSON,
+  getMeasurementJSON
 } = require('./saveMeasurementCSV');
 
 const app = express();
@@ -54,6 +57,11 @@ app.get('/api/health', (req, res) => {
 app.post('/api/surgical-cases/save-csv', saveMeasurementCSVRoute);
 app.get('/api/surgical-cases/list-csv', listMeasurementCSV);
 app.get('/api/surgical-cases/get-csv', getMeasurementCSV);
+
+// Surgical case JSON endpoints
+app.post('/api/surgical-cases/save-json', saveMeasurementJSON);
+app.get('/api/surgical-cases/list-json', listMeasurementJSON);
+app.get('/api/surgical-cases/get-json', getMeasurementJSON);
 
 // Start server
 app.listen(PORT, () => {
