@@ -57,7 +57,7 @@ export default function downloadCSVReport(measurementData) {
   // Download CSV to browser (existing behavior)
   _createAndDownloadFile(csvContent);
 
-  // Also save to surgical_case directory structure
+  // Also save to syncforge directory structure
   _saveCSVToSurgicalCase(csvRows, measurementData);
 }
 
@@ -112,8 +112,8 @@ function _createAndDownloadFile(csvContent) {
 }
 
 /**
- * Save CSV to surgical_case directory structure
- * Calls backend API to save file: surgical_case/studies/{StudyInstanceUID}/{SeriesInstanceUID}/measurements-{timestamp}.csv
+ * Save CSV to syncforge directory structure
+ * Calls backend API to save file: syncforge/studies/{StudyInstanceUID}/{SeriesInstanceUID}/measurements-{timestamp}.csv
  */
 async function _saveCSVToSurgicalCase(csvContent, measurementData) {
   if (!measurementData || measurementData.length === 0) {
@@ -146,7 +146,7 @@ async function _saveCSVToSurgicalCase(csvContent, measurementData) {
 
   try {
     // Call backend API endpoint (use full URL with port 3001)
-    const response = await fetch('http://localhost:3001/api/surgical-cases/save-csv', {
+    const response = await fetch('http://localhost:3001/api/syncforge/save-csv', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -159,12 +159,12 @@ async function _saveCSVToSurgicalCase(csvContent, measurementData) {
       console.log(`✅ Measurement CSV saved to: ${result.filePath}`);
     } else {
       const error = await response.text();
-      console.warn(`⚠️ Failed to save CSV to surgical_case: ${error}`);
+      console.warn(`⚠️ Failed to save CSV to syncforge: ${error}`);
       // Don't throw - browser download still succeeded
     }
   } catch (error) {
     // Silently fail if backend is not available
     // Browser download still works
-    console.warn('⚠️ Could not save CSV to surgical_case (backend may not be configured):', error.message);
+    console.warn('⚠️ Could not save CSV to syncforge (backend may not be configured):', error.message);
   }
 }

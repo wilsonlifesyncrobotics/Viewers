@@ -1,11 +1,11 @@
-# Surgical Case Data Storage
+# SyncForge Data Storage
 
-This directory stores case-specific surgical data linked to DICOM studies.
+This directory stores case-specific measurement data linked to DICOM studies.
 
 ## Structure
 
 ```
-surgical_case/
+syncforge/
 ├── api/                            # Backend API for saving files
 │   ├── server.js                  # Express server example
 │   └── saveMeasurementCSV.js     # CSV save endpoint
@@ -60,7 +60,7 @@ Example: `1.2.840.113619.2.55.3.4064710686.932.1720634932.125/`
 
 When you click the "CSV" export button in OHIF's measurement panel:
 1. ✅ CSV downloads to your browser (existing behavior)
-2. ✅ CSV is automatically saved to: `surgical_case/studies/{StudyInstanceUID}/{SeriesInstanceUID}/measurements-{timestamp}.csv`
+2. ✅ CSV is automatically saved to: `syncforge/studies/{StudyInstanceUID}/{SeriesInstanceUID}/measurements-{timestamp}.csv`
 
 ### Backend Setup
 
@@ -73,17 +73,17 @@ To enable CSV auto-save, you need a backend API server running:
 npm install express
 
 # Run the server
-node surgical_case/api/server.js
+node syncforge/api/server.js
 
 # Or with custom port/workspace
-OHIF_WORKSPACE_ROOT=/path/to/Viewers PORT=3001 node surgical_case/api/server.js
+OHIF_WORKSPACE_ROOT=/path/to/Viewers PORT=3001 node syncforge/api/server.js
 ```
 
 The server will run on `http://localhost:3001` by default.
 
 #### Option 2: Integrate into Your Existing Backend
 
-Copy `surgical_case/api/saveMeasurementCSV.js` to your backend and add the route:
+Copy `syncforge/api/saveMeasurementCSV.js` to your backend and add the route:
 
 ```javascript
 const express = require('express');
@@ -91,7 +91,7 @@ const { saveMeasurementCSVRoute } = require('./saveMeasurementCSV');
 const app = express();
 
 app.use(express.json());
-app.post('/api/surgical-cases/save-csv', saveMeasurementCSVRoute);
+app.post('/api/syncforge/save-csv', saveMeasurementCSVRoute);
 ```
 
 #### Option 3: Configure OHIF to Use Different API URL
@@ -100,9 +100,9 @@ If your backend runs on a different URL, modify `downloadCSVReport.js`:
 
 ```javascript
 // Change this line:
-const response = await fetch('/api/surgical-cases/save-csv', {
+const response = await fetch('/api/syncforge/save-csv', {
   // To your backend URL:
-  const response = await fetch('http://localhost:3001/api/surgical-cases/save-csv', {
+  const response = await fetch('http://localhost:3001/api/syncforge/save-csv', {
 ```
 
 ### CSV File Naming

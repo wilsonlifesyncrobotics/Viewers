@@ -34,7 +34,7 @@ export async function saveMeasurementsJSON(measurements, studyInstanceUID, serie
     measurements: measurements.map(m => {
       // Determine measurement type from multiple possible sources
       let measurementType = m.type || m.toolName || m.label?.split('-')[0] || 'Unknown';
-      
+
       // If type is still not clear, try to infer from displayText structure
       if (measurementType === 'Unknown' && m.displayText) {
         // FiducialMarker has X, Y, Z in secondary
@@ -42,30 +42,30 @@ export async function saveMeasurementsJSON(measurements, studyInstanceUID, serie
           measurementType = 'FiducialMarker';
         }
       }
-      
+
       return {
         // Core identification
         uid: m.uid,
         label: m.label,
         type: measurementType, // 'Length', 'Bidirectional', 'FiducialMarker', etc.
-        
+
         // DICOM references
         SOPInstanceUID: m.SOPInstanceUID,
         FrameOfReferenceUID: m.FrameOfReferenceUID,
         referenceSeriesUID: m.referenceSeriesUID,
         referenceStudyUID: m.referenceStudyUID,
-        
+
         // Measurement data (tool-specific)
         data: m.data, // Full data object
         points: m.points, // Array of coordinate points
-        
+
         // Display information
         displayText: m.displayText,
         description: m.description,
-        
+
         // Metadata
         metadata: m.metadata,
-        
+
         // Rendering hints
         isVisible: m.isVisible !== false,
         isLocked: m.isLocked || false,
@@ -74,7 +74,7 @@ export async function saveMeasurementsJSON(measurements, studyInstanceUID, serie
   };
 
   try {
-    const response = await fetch('http://localhost:3001/api/surgical-cases/save-json', {
+    const response = await fetch('http://localhost:3001/api/syncforge/save-json', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -111,7 +111,7 @@ export async function loadMeasurementsJSON(studyInstanceUID, seriesInstanceUID) 
     // First, list available JSON files
     const params = new URLSearchParams({ studyInstanceUID, seriesInstanceUID });
     const listResponse = await fetch(
-      `http://localhost:3001/api/surgical-cases/list-json?${params.toString()}`
+      `http://localhost:3001/api/syncforge/list-json?${params.toString()}`
     );
 
     if (!listResponse.ok) {
@@ -134,7 +134,7 @@ export async function loadMeasurementsJSON(studyInstanceUID, seriesInstanceUID) 
     });
 
     const getResponse = await fetch(
-      `http://localhost:3001/api/surgical-cases/get-json?${getParams.toString()}`
+      `http://localhost:3001/api/syncforge/get-json?${getParams.toString()}`
     );
 
     if (getResponse.ok) {

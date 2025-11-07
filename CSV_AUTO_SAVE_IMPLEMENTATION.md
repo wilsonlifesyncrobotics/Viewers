@@ -1,8 +1,8 @@
-# CSV Auto-Save to Surgical Case Directory
+# CSV Auto-Save to SyncForge Directory
 
 ## Overview
 
-When users click the "CSV" export button in OHIF's measurement panel, the CSV file is now automatically saved to the `surgical_case` directory structure in addition to downloading to the browser.
+When users click the "CSV" export button in OHIF's measurement panel, the CSV file is now automatically saved to the `syncforge` directory structure in addition to downloading to the browser.
 
 ## Implementation
 
@@ -13,18 +13,18 @@ When users click the "CSV" export button in OHIF's measurement panel, the CSV fi
 - Modified `downloadCSVReport()` to call `_saveCSVToSurgicalCase()` after browser download
 - New function `_saveCSVToSurgicalCase()` extracts StudyInstanceUID and SeriesInstanceUID
 - Generates timestamped filename: `measurements-YYYY-MM-DDTHH-MM-SS.csv`
-- Calls backend API endpoint: `POST /api/surgical-cases/save-csv`
+- Calls backend API endpoint: `POST /api/syncforge/save-csv`
 - Gracefully handles errors (browser download still works if backend unavailable)
 
 ### Backend API
 
 **Files Created:**
-- `surgical_case/api/saveMeasurementCSV.js` - API endpoint handler
-- `surgical_case/api/server.js` - Standalone Express server example
+- `syncforge/api/saveMeasurementCSV.js` - API endpoint handler
+- `syncforge/api/server.js` - Standalone Express server example
 
 **API Endpoint:**
 ```
-POST /api/surgical-cases/save-csv
+POST /api/syncforge/save-csv
 Content-Type: application/json
 
 {
@@ -39,8 +39,8 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "filePath": "/path/to/surgical_case/studies/.../measurements-2025-11-07T22-05-01.csv",
-  "relativePath": "surgical_case/studies/.../measurements-2025-11-07T22-05-01.csv",
+  "filePath": "/path/to/syncforge/studies/.../measurements-2025-11-07T22-05-01.csv",
+  "relativePath": "syncforge/studies/.../measurements-2025-11-07T22-05-01.csv",
   "message": "CSV file saved successfully"
 }
 ```
@@ -49,7 +49,7 @@ Content-Type: application/json
 
 CSV files are saved to:
 ```
-surgical_case/
+syncforge/
 └── studies/
     └── {StudyInstanceUID}/
         └── {SeriesInstanceUID}/
@@ -65,24 +65,24 @@ surgical_case/
 1. **Start the backend server:**
    ```bash
    npm install express  # If not already installed
-   node surgical_case/api/server.js
+   node syncforge/api/server.js
    ```
 
 2. **In OHIF:**
    - Load a study with measurements
    - Click "CSV" button in measurement panel
    - CSV downloads to browser ✅
-   - CSV also saved to `surgical_case/studies/.../` ✅
+   - CSV also saved to `syncforge/studies/.../` ✅
 
 ### Integration with Existing Backend
 
 If you already have a Node.js/Express backend:
 
 ```javascript
-const { saveMeasurementCSVRoute } = require('./surgical_case/api/saveMeasurementCSV');
+const { saveMeasurementCSVRoute } = require('./syncforge/api/saveMeasurementCSV');
 
 app.use(express.json());
-app.post('/api/surgical-cases/save-csv', saveMeasurementCSVRoute);
+app.post('/api/syncforge/save-csv', saveMeasurementCSVRoute);
 ```
 
 ### Custom Configuration
@@ -90,7 +90,7 @@ app.post('/api/surgical-cases/save-csv', saveMeasurementCSVRoute);
 **Change API URL:**
 Edit `platform/core/src/utils/downloadCSVReport.js`:
 ```javascript
-const response = await fetch('http://your-backend:port/api/surgical-cases/save-csv', {
+const response = await fetch('http://your-backend:port/api/syncforge/save-csv', {
 ```
 
 **Change workspace root:**
@@ -107,21 +107,21 @@ OHIF_WORKSPACE_ROOT=/path/to/Viewers node server.js
 
 ## Testing
 
-1. Start backend server: `node surgical_case/api/server.js`
+1. Start backend server: `node syncforge/api/server.js`
 2. Load study in OHIF
 3. Add some measurements (fiducials, lengths, etc.)
 4. Click "CSV" export button
 5. Check:
    - CSV downloads to browser ✅
-   - File appears in `surgical_case/studies/{StudyInstanceUID}/{SeriesInstanceUID}/` ✅
+   - File appears in `syncforge/studies/{StudyInstanceUID}/{SeriesInstanceUID}/` ✅
    - Console shows success message ✅
 
 ## Benefits
 
-✅ **Automatic backup** - All CSV exports are saved automatically  
-✅ **Organized by study** - Easy to find measurements for specific cases  
-✅ **Timestamped** - Multiple exports don't overwrite each other  
-✅ **Non-intrusive** - Browser download still works if backend unavailable  
+✅ **Automatic backup** - All CSV exports are saved automatically
+✅ **Organized by study** - Easy to find measurements for specific cases
+✅ **Timestamped** - Multiple exports don't overwrite each other
+✅ **Non-intrusive** - Browser download still works if backend unavailable
 ✅ **Production-ready** - Error handling and validation included
 
 ## Future Enhancements
@@ -131,4 +131,3 @@ OHIF_WORKSPACE_ROOT=/path/to/Viewers node server.js
 - [ ] Support for multiple studies in one export
 - [ ] Automatic cleanup of old CSV files
 - [ ] Export history tracking
-

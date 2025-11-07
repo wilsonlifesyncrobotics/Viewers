@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 
 /**
- * Simple Express Server for OHIF Surgical Case CSV Storage
+ * Simple Express Server for OHIF SyncForge Storage
  *
- * This server provides an API endpoint to save measurement CSV files
- * to the surgical_case directory structure.
+ * This server provides an API endpoint to save measurement CSV/JSON files
+ * to the syncforge directory structure.
  *
  * Usage:
- *   node surgical_case/api/server.js
+ *   node syncforge/api/server.js
  *
  * Or with environment variables:
- *   OHIF_WORKSPACE_ROOT=/path/to/Viewers PORT=3001 node surgical_case/api/server.js
+ *   OHIF_WORKSPACE_ROOT=/path/to/Viewers PORT=3001 node syncforge/api/server.js
  */
 
 const express = require('express');
 const path = require('path');
-const { 
+const {
   saveMeasurementCSVRoute,
   listMeasurementCSV,
   getMeasurementCSV,
@@ -49,29 +49,30 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     workspaceRoot: WORKSPACE_ROOT,
-    surgicalCaseDir: path.join(WORKSPACE_ROOT, 'surgical_case'),
+    syncforgeDir: path.join(WORKSPACE_ROOT, 'syncforge'),
   });
 });
 
-// Surgical case CSV endpoints
-app.post('/api/surgical-cases/save-csv', saveMeasurementCSVRoute);
-app.get('/api/surgical-cases/list-csv', listMeasurementCSV);
-app.get('/api/surgical-cases/get-csv', getMeasurementCSV);
+// SyncForge CSV endpoints
+app.post('/api/syncforge/save-csv', saveMeasurementCSVRoute);
+app.get('/api/syncforge/list-csv', listMeasurementCSV);
+app.get('/api/syncforge/get-csv', getMeasurementCSV);
 
-// Surgical case JSON endpoints
-app.post('/api/surgical-cases/save-json', saveMeasurementJSON);
-app.get('/api/surgical-cases/list-json', listMeasurementJSON);
-app.get('/api/surgical-cases/get-json', getMeasurementJSON);
+// SyncForge JSON endpoints
+app.post('/api/syncforge/save-json', saveMeasurementJSON);
+app.get('/api/syncforge/list-json', listMeasurementJSON);
+app.get('/api/syncforge/get-json', getMeasurementJSON);
 
 // Start server
 app.listen(PORT, () => {
   console.log('═══════════════════════════════════════════════════════');
-  console.log('🚀 OHIF Surgical Case CSV Storage Server');
+  console.log('🚀 OHIF SyncForge Storage Server');
   console.log('═══════════════════════════════════════════════════════');
   console.log(`📡 Server running on: http://localhost:${PORT}`);
   console.log(`📁 Workspace root: ${WORKSPACE_ROOT}`);
-  console.log(`💾 Surgical case dir: ${path.join(WORKSPACE_ROOT, 'surgical_case')}`);
-  console.log(`📋 CSV endpoint: POST http://localhost:${PORT}/api/surgical-cases/save-csv`);
+  console.log(`💾 SyncForge dir: ${path.join(WORKSPACE_ROOT, 'syncforge')}`);
+  console.log(`📋 CSV endpoint: POST http://localhost:${PORT}/api/syncforge/save-csv`);
+  console.log(`📋 JSON endpoint: POST http://localhost:${PORT}/api/syncforge/save-json`);
   console.log('═══════════════════════════════════════════════════════');
 });
 

@@ -1,8 +1,8 @@
 /**
  * Backend API Endpoint for Saving Measurement CSV Files
  *
- * This endpoint saves CSV files to the surgical_case directory structure:
- * surgical_case/studies/{StudyInstanceUID}/{SeriesInstanceUID}/measurements-{timestamp}.csv
+ * This endpoint saves CSV files to the syncforge directory structure:
+ * syncforge/studies/{StudyInstanceUID}/{SeriesInstanceUID}/measurements-{timestamp}.csv
  *
  * Usage:
  * 1. Add this endpoint to your Express/Node.js backend server
@@ -19,7 +19,7 @@
  * app.use(express.json());
  *
  * // Add this route
- * app.post('/api/surgical-cases/save-csv', async (req, res) => {
+ * app.post('/api/syncforge/save-csv', async (req, res) => {
  *   // ... (use code below)
  * });
  */
@@ -28,7 +28,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 /**
- * Save measurement CSV to surgical_case directory structure
+ * Save measurement CSV to syncforge directory structure
  *
  * @param {Object} req - Express request object
  * @param {Object} req.body - Request body containing:
@@ -50,10 +50,10 @@ async function saveMeasurementCSV(req, res) {
     }
 
     // Get workspace root directory (adjust path as needed)
-    // __dirname is surgical_case/api, so go up 2 levels to get to workspace root
+    // __dirname is syncforge/api, so go up 2 levels to get to workspace root
     const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..', '..');
-    const surgicalCaseDir = path.join(workspaceRoot, 'surgical_case');
-    const studiesDir = path.join(surgicalCaseDir, 'studies');
+    const syncforgeDir = path.join(workspaceRoot, 'syncforge');
+    const studiesDir = path.join(syncforgeDir, 'studies');
     const studyDir = path.join(studiesDir, studyInstanceUID);
     const seriesDir = path.join(studyDir, seriesInstanceUID);
 
@@ -76,7 +76,7 @@ async function saveMeasurementCSV(req, res) {
     res.json({
       success: true,
       filePath: filePath,
-      relativePath: `surgical_case/studies/${studyInstanceUID}/${seriesInstanceUID}/${sanitizedFilename}`,
+      relativePath: `syncforge/studies/${studyInstanceUID}/${seriesInstanceUID}/${sanitizedFilename}`,
       message: 'CSV file saved successfully',
     });
   } catch (error) {
@@ -114,8 +114,8 @@ async function listMeasurementCSV(req, res) {
     }
 
     const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..', '..');
-    const surgicalCaseDir = path.join(workspaceRoot, 'surgical_case');
-    const studiesDir = path.join(surgicalCaseDir, 'studies');
+    const syncforgeDir = path.join(workspaceRoot, 'syncforge');
+    const studiesDir = path.join(syncforgeDir, 'studies');
     const studyDir = path.join(studiesDir, studyInstanceUID);
 
     // Check if study directory exists
@@ -137,7 +137,7 @@ async function listMeasurementCSV(req, res) {
           .map(f => ({
             filename: f,
             path: path.join(seriesDir, f),
-            relativePath: `surgical_case/studies/${studyInstanceUID}/${seriesInstanceUID}/${f}`,
+            relativePath: `syncforge/studies/${studyInstanceUID}/${seriesInstanceUID}/${f}`,
             studyInstanceUID,
             seriesInstanceUID,
           }));
@@ -158,7 +158,7 @@ async function listMeasurementCSV(req, res) {
               .map(f => ({
                 filename: f,
                 path: path.join(seriesDir, f),
-                relativePath: `surgical_case/studies/${studyInstanceUID}/${seriesUID}/${f}`,
+                relativePath: `syncforge/studies/${studyInstanceUID}/${seriesUID}/${f}`,
                 studyInstanceUID,
                 seriesInstanceUID: seriesUID,
               }));
@@ -200,9 +200,9 @@ async function getMeasurementCSV(req, res) {
     }
 
     const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..', '..');
-    const surgicalCaseDir = path.join(workspaceRoot, 'surgical_case');
+    const syncforgeDir = path.join(workspaceRoot, 'syncforge');
     const filePath = path.join(
-      surgicalCaseDir,
+      syncforgeDir,
       'studies',
       studyInstanceUID,
       seriesInstanceUID,
@@ -247,8 +247,8 @@ async function saveMeasurementJSON(req, res) {
     }
 
     const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..', '..');
-    const surgicalCaseDir = path.join(workspaceRoot, 'surgical_case');
-    const studiesDir = path.join(surgicalCaseDir, 'studies');
+    const syncforgeDir = path.join(workspaceRoot, 'syncforge');
+    const studiesDir = path.join(syncforgeDir, 'studies');
     const studyDir = path.join(studiesDir, studyInstanceUID);
     const seriesDir = path.join(studyDir, seriesInstanceUID);
 
@@ -265,7 +265,7 @@ async function saveMeasurementJSON(req, res) {
     res.json({
       success: true,
       filePath: filePath,
-      relativePath: `surgical_case/studies/${studyInstanceUID}/${seriesInstanceUID}/${sanitizedFilename}`,
+      relativePath: `syncforge/studies/${studyInstanceUID}/${seriesInstanceUID}/${sanitizedFilename}`,
       message: 'JSON file saved successfully',
     });
   } catch (error) {
@@ -291,8 +291,8 @@ async function listMeasurementJSON(req, res) {
     }
 
     const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..', '..');
-    const surgicalCaseDir = path.join(workspaceRoot, 'surgical_case');
-    const studiesDir = path.join(surgicalCaseDir, 'studies');
+    const syncforgeDir = path.join(workspaceRoot, 'syncforge');
+    const studiesDir = path.join(syncforgeDir, 'studies');
     const studyDir = path.join(studiesDir, studyInstanceUID);
 
     try {
@@ -312,7 +312,7 @@ async function listMeasurementJSON(req, res) {
           .map(f => ({
             filename: f,
             path: path.join(seriesDir, f),
-            relativePath: `surgical_case/studies/${studyInstanceUID}/${seriesInstanceUID}/${f}`,
+            relativePath: `syncforge/studies/${studyInstanceUID}/${seriesInstanceUID}/${f}`,
             studyInstanceUID,
             seriesInstanceUID,
           }));
@@ -332,7 +332,7 @@ async function listMeasurementJSON(req, res) {
               .map(f => ({
                 filename: f,
                 path: path.join(seriesDir, f),
-                relativePath: `surgical_case/studies/${studyInstanceUID}/${seriesUID}/${f}`,
+                relativePath: `syncforge/studies/${studyInstanceUID}/${seriesUID}/${f}`,
                 studyInstanceUID,
                 seriesInstanceUID: seriesUID,
               }));
@@ -368,9 +368,9 @@ async function getMeasurementJSON(req, res) {
     }
 
     const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..', '..');
-    const surgicalCaseDir = path.join(workspaceRoot, 'surgical_case');
+    const syncforgeDir = path.join(workspaceRoot, 'syncforge');
     const filePath = path.join(
-      surgicalCaseDir,
+      syncforgeDir,
       'studies',
       studyInstanceUID,
       seriesInstanceUID,
@@ -428,11 +428,11 @@ module.exports = {
  * });
  *
  * // Surgical case CSV endpoint
- * app.post('/api/surgical-cases/save-csv', saveMeasurementCSVRoute);
+ * app.post('/api/syncforge/save-csv', saveMeasurementCSVRoute);
  *
  * const PORT = process.env.PORT || 3000;
  * app.listen(PORT, () => {
  *   console.log(`Server running on port ${PORT}`);
- *   console.log(`Surgical case directory: ${path.join(process.cwd(), 'surgical_case')}`);
+ *   console.log(`Surgical case directory: ${path.join(process.cwd(), 'syncforge')}`);
  * });
  */
