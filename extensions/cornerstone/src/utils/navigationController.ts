@@ -295,13 +295,14 @@ class NavigationController {
    * Useful for setting the tracking origin to current crosshair position
    */
   public setCenterToCurrentPosition(): void {
-    const { trackingService, cornerstoneViewportService } = this.servicesManager.services;
+    const { trackingService } = this.servicesManager.services;
 
-    if (!trackingService || !cornerstoneViewportService) {
+    if (!trackingService) {
+      console.warn('⚠️ TrackingService not available');
       return;
     }
 
-    // Get current crosshair position from the first viewport
+    // Get current crosshair annotation position
     const renderingEngine = getRenderingEngine('OHIFCornerstoneRenderingEngine');
     if (!renderingEngine) {
       console.warn('⚠️ No rendering engine found');
@@ -314,15 +315,55 @@ class NavigationController {
       return;
     }
 
-    const firstViewport = viewports[0];
-    if (firstViewport) {
+    // Try to get actual crosshair annotation position
+    let crosshairPosition = null;
+
+    for (const viewport of viewports) {
+      try {
+        const element = viewport.element;
+        if (!element) continue;
+
+        // Get crosshairs annotations
+        const annotations = annotation.state.getAnnotations('Crosshairs', element);
+        
+        if (annotations && annotations.length > 0) {
+          const crosshairAnnotation = annotations[0];
+          
+          // Try different possible locations for the center
+          if (crosshairAnnotation.data?.handles?.rotationPoints) {
+            crosshairPosition = crosshairAnnotation.data.handles.rotationPoints[0];
+            console.log(`📍 Found crosshair from rotationPoints in ${viewport.id}`);
+            break;
+          } else if (crosshairAnnotation.data?.handles?.toolCenter) {
+            crosshairPosition = crosshairAnnotation.data.handles.toolCenter;
+            console.log(`📍 Found crosshair from toolCenter in ${viewport.id}`);
+            break;
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ Error getting crosshair from ${viewport.id}:`, error);
+      }
+    }
+
+    // Fallback to camera focal point if no crosshair found
+    if (!crosshairPosition) {
+      console.warn('⚠️ No crosshair annotation found, using camera focal point as fallback');
+      const firstViewport = viewports[0];
       const camera = firstViewport.getCamera();
-      const position = camera.focalPoint;
+      crosshairPosition = camera.focalPoint;
+    }
+
+    if (crosshairPosition) {
+      const position = Array.isArray(crosshairPosition) 
+        ? crosshairPosition 
+        : [crosshairPosition[0], crosshairPosition[1], crosshairPosition[2]];
 
       // Send to tracking server
       trackingService.setCenter(position);
 
-      console.log(`📍 Tracking center set to: ${position.map(v => v.toFixed(1)).join(', ')}`);
+      console.log(`📍 Tracking center set to: [${position.map(v => v.toFixed(1)).join(', ')}]`);
+    } else {
+      console.error('❌ Could not determine center position');
     }
   }
 
