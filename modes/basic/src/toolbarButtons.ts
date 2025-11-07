@@ -647,9 +647,14 @@ const toolbarButtons: Button[] = [
     uiType: 'ohif.toolButton',
     props: {
       icon: 'Navigation',
-      label: i18n.t('Buttons:Real-time Navigation'),
-      tooltip: i18n.t('Buttons:Enable real-time surgical navigation with tracking (20Hz)'),
-      commands: 'toggleNavigation',
+      label: i18n.t('Buttons:Real-time Navigation (Linear)'),
+      tooltip: i18n.t('Buttons:Enable linear axial navigation (up/down through slices)'),
+      commands: [
+        {
+          commandName: 'toggleNavigation',
+          commandOptions: { mode: 'linear' },
+        }
+      ],
       evaluate: 'evaluate.action',
     },
   },
