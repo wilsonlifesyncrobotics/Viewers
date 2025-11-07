@@ -145,8 +145,8 @@ async function _saveCSVToSurgicalCase(csvContent, measurementData) {
   };
 
   try {
-    // Call backend API endpoint
-    const response = await fetch('/api/surgical-cases/save-csv', {
+    // Call backend API endpoint (use full URL with port 3001)
+    const response = await fetch('http://localhost:3001/api/surgical-cases/save-csv', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

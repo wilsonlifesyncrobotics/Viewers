@@ -1,23 +1,23 @@
 /**
  * Backend API Endpoint for Saving Measurement CSV Files
- * 
+ *
  * This endpoint saves CSV files to the surgical_case directory structure:
  * surgical_case/studies/{StudyInstanceUID}/{SeriesInstanceUID}/measurements-{timestamp}.csv
- * 
+ *
  * Usage:
  * 1. Add this endpoint to your Express/Node.js backend server
  * 2. Ensure the server has write access to the OHIF workspace directory
  * 3. Configure CORS if needed
- * 
+ *
  * Example integration with Express:
- * 
+ *
  * const express = require('express');
  * const fs = require('fs').promises;
  * const path = require('path');
  * const app = express();
- * 
+ *
  * app.use(express.json());
- * 
+ *
  * // Add this route
  * app.post('/api/surgical-cases/save-csv', async (req, res) => {
  *   // ... (use code below)
@@ -29,7 +29,7 @@ const path = require('path');
 
 /**
  * Save measurement CSV to surgical_case directory structure
- * 
+ *
  * @param {Object} req - Express request object
  * @param {Object} req.body - Request body containing:
  *   - studyInstanceUID: string
@@ -50,8 +50,8 @@ async function saveMeasurementCSV(req, res) {
     }
 
     // Get workspace root directory (adjust path as needed)
-    // This assumes the backend runs from the OHIF workspace root
-    const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..');
+    // __dirname is surgical_case/api, so go up 2 levels to get to workspace root
+    const workspaceRoot = process.env.OHIF_WORKSPACE_ROOT || path.join(__dirname, '..', '..');
     const surgicalCaseDir = path.join(workspaceRoot, 'surgical_case');
     const studiesDir = path.join(surgicalCaseDir, 'studies');
     const studyDir = path.join(studiesDir, studyInstanceUID);
@@ -102,14 +102,14 @@ module.exports = {
 
 /**
  * Example Express.js integration:
- * 
+ *
  * const express = require('express');
  * const { saveMeasurementCSVRoute } = require('./surgicalCaseAPI');
  * const app = express();
- * 
+ *
  * app.use(express.json());
  * app.use(express.static('public')); // Serve OHIF frontend
- * 
+ *
  * // CORS configuration (if needed)
  * app.use((req, res, next) => {
  *   res.header('Access-Control-Allow-Origin', '*');
@@ -117,14 +117,13 @@ module.exports = {
  *   res.header('Access-Control-Allow-Headers', 'Content-Type');
  *   next();
  * });
- * 
+ *
  * // Surgical case CSV endpoint
  * app.post('/api/surgical-cases/save-csv', saveMeasurementCSVRoute);
- * 
+ *
  * const PORT = process.env.PORT || 3000;
  * app.listen(PORT, () => {
  *   console.log(`Server running on port ${PORT}`);
  *   console.log(`Surgical case directory: ${path.join(process.cwd(), 'surgical_case')}`);
  * });
  */
-
