@@ -126,5 +126,3 @@ Let me know and I can:
 2. Create a custom hotkey (e.g., Ctrl+N)
 3. Add the button to a different location
 4. Create a dedicated navigation panel
-
-

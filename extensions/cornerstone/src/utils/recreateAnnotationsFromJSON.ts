@@ -20,9 +20,9 @@ export async function recreateAnnotationsFromJSON(savedData, servicesManager) {
 
   const { measurementService } = servicesManager.services;
   const measurements = savedData.measurements;
-  
+
   console.log(`🔄 Recreating ${measurements.length} annotations...`);
-  
+
   let recreatedCount = 0;
 
   // Get rendering engine and viewports
@@ -73,13 +73,13 @@ async function recreateSingleAnnotation(measurement, element, measurementService
   switch (type) {
     case 'FiducialMarker':
       return recreateFiducialMarker(measurement, element, measurementService);
-    
+
     case 'Length':
       return recreateLength(measurement, element, measurementService);
-    
+
     case 'Bidirectional':
       return recreateBidirectional(measurement, element, measurementService);
-    
+
     // Add more types as needed
     default:
       console.warn(`⚠️ Unknown measurement type: ${type}`);
@@ -91,7 +91,7 @@ async function recreateSingleAnnotation(measurement, element, measurementService
  * Recreate a FiducialMarker annotation
  */
 function recreateFiducialMarker(measurement, element, measurementService) {
-  const { label, points, SOPInstanceUID, FrameOfReferenceUID, referenceSeriesUID, referenceStudyUID } = measurement;
+  const { label, points, SOPInstanceUID, FrameOfReferenceUID, referenceSeriesUID, referenceStudyUID, metadata } = measurement;
 
   if (!points || points.length === 0) {
     console.error('❌ No points data for fiducial');
@@ -99,6 +99,14 @@ function recreateFiducialMarker(measurement, element, measurementService) {
   }
 
   const point = points[0]; // Fiducial has one point
+
+  // Use the saved referencedImageId if available
+  const referencedImageId = metadata?.referencedImageId || '';
+
+  console.log('🔍 Recreating fiducial with:');
+  console.log('  - referencedImageId:', referencedImageId);
+  console.log('  - FrameOfReferenceUID:', FrameOfReferenceUID);
+  console.log('  - SOPInstanceUID:', SOPInstanceUID);
 
   // Create the annotation structure
   const annotationUID = csUtils.uuidv4();
@@ -111,7 +119,7 @@ function recreateFiducialMarker(measurement, element, measurementService) {
     metadata: {
       toolName: 'FiducialMarker',
       FrameOfReferenceUID: FrameOfReferenceUID || '',
-      referencedImageId: ``, // Will be set by viewport
+      referencedImageId: referencedImageId, // Use saved referencedImageId
     },
     data: {
       label: label || 'Fiducial',
@@ -221,4 +229,3 @@ function recreateBidirectional(measurement, element, measurementService) {
 }
 
 export default recreateAnnotationsFromJSON;
-

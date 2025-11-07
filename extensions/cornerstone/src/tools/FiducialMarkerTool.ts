@@ -157,6 +157,9 @@ class FiducialMarkerTool extends AnnotationTool {
 
     const annotations = annotation.state.getAnnotations(FiducialMarkerTool.toolName, element);
 
+    // Debug: Log rendering calls
+    console.log(`🎨 [FiducialMarker renderAnnotation] viewport=${viewport.id}, found ${annotations?.length || 0} annotations`);
+
     if (!annotations?.length) {
       return renderStatus;
     }
@@ -210,7 +213,10 @@ class FiducialMarkerTool extends AnnotationTool {
 
       // Get slice spacing/thickness for this viewport
       // Typical slice spacing is 1-5mm, use a threshold
-      const sliceThreshold = 2.0; // mm - only show if within 2mm of slice
+      const sliceThreshold = 5.0; // mm - increased from 2.0 to 5.0 for better visibility
+
+      // Debug: Log slice check
+      console.log(`🎯 [${data.label}] distance=${distance.toFixed(2)}mm, threshold=${sliceThreshold}mm, visible=${distance <= sliceThreshold}`);
 
       if (distance > sliceThreshold) {
         // Point is not on this slice, skip rendering

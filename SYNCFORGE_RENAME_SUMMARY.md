@@ -155,4 +155,3 @@ OHIF_WORKSPACE_ROOT=/path/to/Viewers PORT=3001 node syncforge/api/server.js
 
 **Status:** ✅ Complete and tested
 **Date:** 2025-11-07
-
