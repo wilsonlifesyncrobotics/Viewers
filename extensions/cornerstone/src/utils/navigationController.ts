@@ -68,13 +68,13 @@ class NavigationController {
       (status: any) => {
         if (status.connected) {
           console.log('✅ Connected! Starting tracking...');
-          
+
           // Send volume center to server if detected
           if (volumeCenter) {
             trackingService.setCenter(volumeCenter);
             console.log('📤 Sent volume center to tracking server');
           }
-          
+
           // Start tracking with specified mode
           trackingService.startTracking(mode);
           connectionSubscription.unsubscribe(); // Clean up this subscription
@@ -414,16 +414,16 @@ class NavigationController {
             if (bounds && bounds.length === 6) {
               // bounds = [xMin, xMax, yMin, yMax, zMin, zMax]
               const [xMin, xMax, yMin, yMax, zMin, zMax] = bounds;
-              
+
               // Calculate geometric center
               const center = [
                 (xMin + xMax) / 2,
                 (yMin + yMax) / 2,
                 (zMin + zMax) / 2,
               ];
-              
+
               console.log(`📊 Volume bounds: X[${xMin.toFixed(1)}, ${xMax.toFixed(1)}] Y[${yMin.toFixed(1)}, ${yMax.toFixed(1)}] Z[${zMin.toFixed(1)}, ${zMax.toFixed(1)}]`);
-              
+
               return center;
             }
           }
@@ -432,7 +432,7 @@ class NavigationController {
     } catch (error) {
       console.error('❌ Error auto-detecting volume center:', error);
     }
-    
+
     return null;
   }
 
@@ -455,16 +455,16 @@ class NavigationController {
             if (bounds && bounds.length === 6) {
               // bounds = [xMin, xMax, yMin, yMax, zMin, zMax]
               const [xMin, xMax, yMin, yMax, zMin, zMax] = bounds;
-              
+
               // Add a small margin to avoid edge cases
               const margin = 1.0; // mm
-              
+
               const clampedPosition = [
                 Math.max(xMin + margin, Math.min(xMax - margin, position[0])),
                 Math.max(yMin + margin, Math.min(yMax - margin, position[1])),
                 Math.max(zMin + margin, Math.min(zMax - margin, position[2])),
               ];
-              
+
               // Log if clamping occurred
               if (this.updateCount % 100 === 0 && (
                 clampedPosition[0] !== position[0] ||
@@ -476,7 +476,7 @@ class NavigationController {
                 console.warn(`   Clamped:  [${clampedPosition.map(v => v.toFixed(1)).join(', ')}]`);
                 console.warn(`   Bounds: X[${xMin.toFixed(1)}, ${xMax.toFixed(1)}] Y[${yMin.toFixed(1)}, ${yMax.toFixed(1)}] Z[${zMin.toFixed(1)}, ${zMax.toFixed(1)}]`);
               }
-              
+
               return clampedPosition;
             }
           }
@@ -485,7 +485,7 @@ class NavigationController {
     } catch (error) {
       console.error('❌ Error getting volume bounds:', error);
     }
-    
+
     return null;
   }
 

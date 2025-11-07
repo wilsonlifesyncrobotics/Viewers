@@ -72,40 +72,40 @@ class TrackingSimulator:
             "timestamp": time.time(),
             "frame_id": int(self.t * 20)
         }
-    
+
     def get_linear_sagittal(self):
         """Simulate linear motion along sagittal (X) axis - left/right"""
         x = self.center[0] + math.sin(self.t * 0.5) * 50  # ±50mm range
         y = self.center[1]
         z = self.center[2]
-        
+
         # Orientation points left/right
         nx = math.cos(self.t * 0.5)
         ny = 0
         nz = 0
-        
+
         self.t += 0.05
-        
+
         return {
             "position": [x, y, z],
             "orientation": [nx, ny, nz],
             "timestamp": time.time(),
             "frame_id": int(self.t * 20)
         }
-    
+
     def get_linear_coronal(self):
         """Simulate linear motion along coronal (Y) axis - anterior/posterior"""
         x = self.center[0]
         y = self.center[1] + math.sin(self.t * 0.5) * 50  # ±50mm range
         z = self.center[2]
-        
+
         # Orientation points forward/backward
         nx = 0
         ny = math.cos(self.t * 0.5)
         nz = 0
-        
+
         self.t += 0.05
-        
+
         return {
             "position": [x, y, z],
             "orientation": [nx, ny, nz],
@@ -147,7 +147,7 @@ class TrackingSimulator:
 
     def get_tracking_data(self, mode="circular"):
         """Get tracking data based on mode
-        
+
         Modes:
         - circular: Circular motion in axial plane
         - linear: Linear motion along Z axis (axial/superior-inferior)

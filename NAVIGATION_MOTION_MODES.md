@@ -118,7 +118,7 @@ z = center[2] + 50*sin(t)  → oscillates up/down
     |
     C ← Center
     |
-    ● 
+    ●
     |
     ↓ (Inferior)
 ```
@@ -245,11 +245,11 @@ function testNextMode() {
     commandsManager.runCommand('stopNavigation');
     return;
   }
-  
+
   const mode = modes[index];
   console.log(`\n🧪 Testing mode: ${mode}`);
   console.log('   Watch viewport for 10 seconds...\n');
-  
+
   commandsManager.runCommand('stopNavigation');
   setTimeout(() => {
     commandsManager.runCommand('startNavigation', { mode: mode });
@@ -387,4 +387,3 @@ commandsManager.runCommand('startNavigation', { mode: 'linear' });
 ```
 
 **Watch your viewport move up and down through the axial slices!** 🎯
-

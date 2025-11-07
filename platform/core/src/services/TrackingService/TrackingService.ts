@@ -73,13 +73,13 @@ class TrackingService extends PubSubService {
         this.isConnected = true;
         this.isConnecting = false;
         this.reconnectAttempts = 0;
-        
+
         // Clear any pending reconnect timeout
         if (this.reconnectTimeout) {
           clearTimeout(this.reconnectTimeout);
           this.reconnectTimeout = null;
         }
-        
+
         this._broadcastEvent(EVENTS.CONNECTION_STATUS, {
           connected: true,
           message: 'Connected to tracking server',
@@ -148,11 +148,11 @@ class TrackingService extends PubSubService {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
-    
+
     // Reset tracking state to prevent auto-reconnect
     this.isTracking = false;
     this.reconnectAttempts = 0;
-    
+
     if (this.ws) {
       console.log('🔌 Disconnecting from tracking server');
       this.ws.close();
@@ -220,7 +220,7 @@ class TrackingService extends PubSubService {
   public setCenter(position: number[]): void {
     if (!this.isConnected) {
       console.warn('⚠️ Not connected to tracking server. Connecting now...');
-      
+
       // Auto-connect and send center after connection
       const subscription = this.subscribe(
         EVENTS.CONNECTION_STATUS,
@@ -235,7 +235,7 @@ class TrackingService extends PubSubService {
           }
         }
       );
-      
+
       this.connect();
       return;
     }
@@ -244,7 +244,7 @@ class TrackingService extends PubSubService {
       command: 'set_center',
       position: position,
     });
-    
+
     console.log(`📍 Center command sent: [${position.map(v => v.toFixed(1)).join(', ')}]`);
   }
 
