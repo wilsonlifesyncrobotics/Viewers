@@ -2190,6 +2190,123 @@ function commandsModule({
         });
       }
     },
+
+    /**
+     * Save all measurements to JSON file in surgical_case directory
+     */
+    saveMeasurementsJSON: async () => {
+      console.log('💾 [saveMeasurementsJSON] Saving measurements to JSON');
+
+      const { measurementService, displaySetService } = servicesManager.services;
+      const measurements = measurementService.getMeasurements();
+
+      if (!measurements || measurements.length === 0) {
+        uiNotificationService?.show({
+          title: 'No Measurements',
+          message: 'No measurements to save',
+          type: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Get Study/Series UIDs from first measurement
+      const firstMeasurement = measurements[0];
+      const studyInstanceUID = firstMeasurement.referenceStudyUID;
+      const seriesInstanceUID = firstMeasurement.referenceSeriesUID;
+
+      if (!studyInstanceUID || !seriesInstanceUID) {
+        uiNotificationService?.show({
+          title: 'Error',
+          message: 'Could not determine study/series IDs',
+          type: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Use the saveMeasurementsJSON utility
+      const { saveMeasurementsJSON } = await import('@ohif/core/src/utils/saveMeasurementsJSON');
+      const result = await saveMeasurementsJSON(measurements, studyInstanceUID, seriesInstanceUID);
+
+      if (result) {
+        uiNotificationService?.show({
+          title: 'Measurements Saved',
+          message: `${measurements.length} measurements saved to JSON`,
+          type: 'success',
+          duration: 3000,
+        });
+      } else {
+        uiNotificationService?.show({
+          title: 'Save Failed',
+          message: 'Could not save measurements (check console)',
+          type: 'error',
+          duration: 3000,
+        });
+      }
+    },
+
+    /**
+     * Load measurements from JSON file in surgical_case directory
+     */
+    loadMeasurementsJSON: async () => {
+      console.log('📂 [loadMeasurementsJSON] Loading measurements from JSON');
+
+      const { displaySetService } = servicesManager.services;
+      
+      // Get active viewport to determine Study/Series UIDs
+      const { viewport } = _getActiveViewportEnabledElement();
+      if (!viewport) {
+        uiNotificationService?.show({
+          title: 'No Active Viewport',
+          message: 'Please open a study first',
+          type: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Get display set from active viewport
+      const displaySets = displaySetService.getActiveDisplaySets();
+      if (!displaySets || displaySets.length === 0) {
+        uiNotificationService?.show({
+          title: 'No Display Set',
+          message: 'Could not determine active study/series',
+          type: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
+
+      const displaySet = displaySets[0];
+      const studyInstanceUID = displaySet.StudyInstanceUID;
+      const seriesInstanceUID = displaySet.SeriesInstanceUID;
+
+      // Load measurements JSON
+      const { loadMeasurementsJSON } = await import('@ohif/core/src/utils/saveMeasurementsJSON');
+      const savedData = await loadMeasurementsJSON(studyInstanceUID, seriesInstanceUID);
+
+      if (!savedData || !savedData.measurements || savedData.measurements.length === 0) {
+        uiNotificationService?.show({
+          title: 'No Saved Measurements',
+          message: 'No saved measurements found for this study/series',
+          type: 'info',
+          duration: 3000,
+        });
+        return;
+      }
+
+      uiNotificationService?.show({
+        title: 'Measurements Loaded',
+        message: `Found ${savedData.measurementCount} saved measurements. Note: Annotations need to be manually recreated.`,
+        type: 'info',
+        duration: 5000,
+      });
+
+      console.log('📋 Loaded measurement data:', savedData);
+      console.log('⚠️ Note: Automatic annotation recreation not yet implemented');
+      console.log('   You can manually recreate annotations using this data');
+    },
     _handlePreviewAction: action => {
       const { viewport } = _getActiveViewportEnabledElement();
       const previewTools = getPreviewTools({ toolGroupService });
@@ -2847,6 +2964,16 @@ function commandsModule({
     },
     addFiducialAtCrosshair: {
       commandFn: actions.addFiducialAtCrosshair,
+      storeContexts: [],
+      options: {},
+    },
+    saveMeasurementsJSON: {
+      commandFn: actions.saveMeasurementsJSON,
+      storeContexts: [],
+      options: {},
+    },
+    loadMeasurementsJSON: {
+      commandFn: actions.loadMeasurementsJSON,
       storeContexts: [],
       options: {},
     },

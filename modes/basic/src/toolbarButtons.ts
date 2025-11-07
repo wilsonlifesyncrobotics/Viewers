@@ -341,6 +341,28 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    id: 'SaveMeasurements',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'icon-save',
+      label: i18n.t('Buttons:Save Measurements'),
+      tooltip: i18n.t('Buttons:Save all measurements to JSON file'),
+      commands: 'saveMeasurementsJSON',
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'LoadMeasurements',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'icon-open-folder',
+      label: i18n.t('Buttons:Load Measurements'),
+      tooltip: i18n.t('Buttons:Load saved measurements from JSON file'),
+      commands: 'loadMeasurementsJSON',
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
     id: 'Cine',
     uiType: 'ohif.toolButton',
     props: {
