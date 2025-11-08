@@ -1,11 +1,13 @@
 /**
  * Navigation Controller
  * Updates crosshair position and MPR orientation from tracking data
+ * Includes coordinate transformation from register (r) to DICOM (d) coordinates
  */
 
 import { vec3 } from 'gl-matrix';
 import { Types as cs3DTypes, utilities as cs3DUtilities, getRenderingEngine } from '@cornerstonejs/core';
 import { annotation, utilities } from '@cornerstonejs/tools';
+import CoordinateTransformer from './CoordinateTransformer';
 
 class NavigationController {
   private servicesManager: any;
@@ -16,9 +18,11 @@ class NavigationController {
   private lastRenderTime: number = 0;
   private targetFPS: number = 25; // Target UI update rate (Hz)
   private minFrameTime: number = 1000 / this.targetFPS; // Min time between UI updates (ms)
+  private coordinateTransformer: CoordinateTransformer;
 
   constructor(servicesManager: any) {
     this.servicesManager = servicesManager;
+    this.coordinateTransformer = new CoordinateTransformer();
     console.log('🧭 NavigationController initialized', { targetFPS: this.targetFPS });
   }
 
@@ -145,6 +149,7 @@ class NavigationController {
   /**
    * Handle tracking update - update crosshair position
    * Data received at 100Hz, but UI updates throttled to 25Hz
+   * Applies coordinate transformation from register to DICOM
    */
   private _handleTrackingUpdate(event: any): void {
     const { position, orientation, frame_id } = event;
@@ -166,17 +171,32 @@ class NavigationController {
       return;
     }
 
+    // Transform coordinates from register to DICOM
+    // Tracking data comes in register (r) coordinates
+    // OHIF/Cornerstone needs DICOM (d) coordinates
+    const registerPosition = position;
+    const dicomPosition = this.coordinateTransformer.hasTransform()
+      ? this.coordinateTransformer.registerToDICOM(registerPosition)
+      : registerPosition;
+
     // Log every 25 renders (about once per second at 25 FPS)
     if (this.updateCount % 25 === 0) {
       const elapsed = (now - this.lastUpdateTime) / 1000;
       const dataHz = this.updateCount / elapsed;
       const renderHz = 1000 / timeSinceLastRender;
-      console.log(`🔄 Update #${this.updateCount} | Data: ${dataHz.toFixed(1)} Hz | UI: ${renderHz.toFixed(1)} Hz → [${position.map(v => v.toFixed(1)).join(', ')}]`);
+      
+      if (this.coordinateTransformer.hasTransform() && !this.coordinateTransformer.isIdentityTransform()) {
+        console.log(`🔄 Update #${this.updateCount} | Data: ${dataHz.toFixed(1)} Hz | UI: ${renderHz.toFixed(1)} Hz`);
+        console.log(`   Register: [${registerPosition.map(v => v.toFixed(1)).join(', ')}]`);
+        console.log(`   DICOM:    [${dicomPosition.map(v => v.toFixed(1)).join(', ')}]`);
+      } else {
+        console.log(`🔄 Update #${this.updateCount} | Data: ${dataHz.toFixed(1)} Hz | UI: ${renderHz.toFixed(1)} Hz → [${dicomPosition.map(v => v.toFixed(1)).join(', ')}]`);
+      }
     }
 
     try {
-      // Update crosshair for each viewport
-      this._updateCrosshairPosition(position, orientation);
+      // Update crosshair for each viewport using DICOM coordinates
+      this._updateCrosshairPosition(dicomPosition, orientation);
       this.lastRenderTime = now;
     } catch (error) {
       console.error('❌ Error updating crosshair:', error);
@@ -509,6 +529,45 @@ class NavigationController {
   }
 
   /**
+   * Load coordinate transformation from case data
+   * @param rMd 4x4 transformation matrix from register to DICOM
+   */
+  public loadTransformation(rMd: number[][] | any): void {
+    try {
+      this.coordinateTransformer.loadTransform(rMd);
+      console.log('✅ Coordinate transformation loaded successfully');
+    } catch (error) {
+      console.error('❌ Failed to load transformation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load transformation from case.json file
+   * Automatically extracts rMd from dicom_series.fixed_image
+   */
+  public async loadTransformationFromCase(caseId: string): Promise<void> {
+    try {
+      // Fetch case.json from SurgicalCase directory
+      // This would need to be implemented based on how case data is accessed in OHIF
+      console.log(`📋 Loading transformation for case: ${caseId}`);
+      console.warn('⚠️ Auto-loading from case.json not yet implemented');
+      console.warn('   Use loadTransformation() with explicit rMd matrix');
+    } catch (error) {
+      console.error('❌ Failed to load case transformation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clear coordinate transformation (use raw tracking data)
+   */
+  public clearTransformation(): void {
+    this.coordinateTransformer.clear();
+    console.log('✅ Coordinate transformation cleared');
+  }
+
+  /**
    * Set target UI update rate (FPS)
    * @param fps Target frames per second (recommended: 20-30)
    */
@@ -526,6 +585,8 @@ class NavigationController {
    * Get navigation status
    */
   public getStatus() {
+    const transform = this.coordinateTransformer.getTransform();
+    
     return {
       navigating: this.isNavigating,
       updateCount: this.updateCount,
@@ -533,6 +594,12 @@ class NavigationController {
       actualFPS: this.lastRenderTime > 0 
         ? 1000 / (performance.now() - this.lastRenderTime) 
         : 0,
+      transformation: {
+        loaded: this.coordinateTransformer.hasTransform(),
+        isIdentity: this.coordinateTransformer.isIdentityTransform(),
+        rMd: transform.rMd,
+        invRMd: transform.invRMd,
+      },
     };
   }
 }
