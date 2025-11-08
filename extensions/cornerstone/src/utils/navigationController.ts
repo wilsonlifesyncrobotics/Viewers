@@ -13,10 +13,13 @@ class NavigationController {
   private isNavigating: boolean = false;
   private updateCount: number = 0;
   private lastUpdateTime: number = 0;
+  private lastRenderTime: number = 0;
+  private targetFPS: number = 25; // Target UI update rate (Hz)
+  private minFrameTime: number = 1000 / this.targetFPS; // Min time between UI updates (ms)
 
   constructor(servicesManager: any) {
     this.servicesManager = servicesManager;
-    console.log('🧭 NavigationController initialized');
+    console.log('🧭 NavigationController initialized', { targetFPS: this.targetFPS });
   }
 
   /**
@@ -58,6 +61,7 @@ class NavigationController {
     this.isNavigating = true;
     this.updateCount = 0;
     this.lastUpdateTime = performance.now();
+    this.lastRenderTime = performance.now();
 
     // Connect to SyncForge tracking API
     console.log('🔗 Connecting to SyncForge tracking API...');
@@ -68,12 +72,12 @@ class NavigationController {
       (status: any) => {
         if (status.connected) {
           console.log('✅ Connected! Tracking data streaming at 100Hz...');
-          
+
           if (volumeCenter) {
             console.log(`📍 Volume center detected: [${volumeCenter.map(v => v.toFixed(1)).join(', ')}]`);
             // Note: setCenter() no longer needed - simulator runs independently
           }
-          
+
           connectionSubscription.unsubscribe(); // Clean up this subscription
         } else if (status.error) {
           console.error('❌ Connection failed:', status.error);
@@ -140,7 +144,7 @@ class NavigationController {
 
   /**
    * Handle tracking update - update crosshair position
-   * This is called at 20Hz from the tracking server
+   * Data received at 100Hz, but UI updates throttled to 25Hz
    */
   private _handleTrackingUpdate(event: any): void {
     const { position, orientation, frame_id } = event;
@@ -148,17 +152,32 @@ class NavigationController {
 
     this.updateCount++;
 
-    // Log every 20 updates for visual feedback
-    if (this.updateCount % 20 === 0) {
-      const now = performance.now();
+    // Throttle UI updates to target FPS
+    const now = performance.now();
+    const timeSinceLastRender = now - this.lastRenderTime;
+    
+    if (timeSinceLastRender < this.minFrameTime) {
+      // Skip this frame - too soon since last render
+      if (this.updateCount % 100 === 0) {
+        const dataHz = this.updateCount / ((now - this.lastUpdateTime) / 1000);
+        const renderHz = 1000 / this.minFrameTime;
+        console.log(`📊 Data: ${dataHz.toFixed(1)} Hz, Rendering: ${renderHz.toFixed(1)} Hz (throttled)`);
+      }
+      return;
+    }
+
+    // Log every 25 renders (about once per second at 25 FPS)
+    if (this.updateCount % 25 === 0) {
       const elapsed = (now - this.lastUpdateTime) / 1000;
-      const hz = this.updateCount / elapsed;
-      console.log(`🔄 Update #${this.updateCount} (${hz.toFixed(1)} Hz) → [${position.map(v => v.toFixed(1)).join(', ')}]`);
+      const dataHz = this.updateCount / elapsed;
+      const renderHz = 1000 / timeSinceLastRender;
+      console.log(`🔄 Update #${this.updateCount} | Data: ${dataHz.toFixed(1)} Hz | UI: ${renderHz.toFixed(1)} Hz → [${position.map(v => v.toFixed(1)).join(', ')}]`);
     }
 
     try {
       // Update crosshair for each viewport
       this._updateCrosshairPosition(position, orientation);
+      this.lastRenderTime = now;
     } catch (error) {
       console.error('❌ Error updating crosshair:', error);
     }
@@ -490,12 +509,30 @@ class NavigationController {
   }
 
   /**
+   * Set target UI update rate (FPS)
+   * @param fps Target frames per second (recommended: 20-30)
+   */
+  public setTargetFPS(fps: number): void {
+    if (fps < 10 || fps > 60) {
+      console.warn(`⚠️ Target FPS should be between 10-60, got ${fps}. Using default 25.`);
+      fps = 25;
+    }
+    this.targetFPS = fps;
+    this.minFrameTime = 1000 / fps;
+    console.log(`🎯 Target UI update rate set to ${fps} Hz`);
+  }
+
+  /**
    * Get navigation status
    */
   public getStatus() {
     return {
       navigating: this.isNavigating,
       updateCount: this.updateCount,
+      targetFPS: this.targetFPS,
+      actualFPS: this.lastRenderTime > 0 
+        ? 1000 / (performance.now() - this.lastRenderTime) 
+        : 0,
     };
   }
 }
