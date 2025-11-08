@@ -18,7 +18,7 @@ import PanelService from './PanelService';
 import WorkflowStepsService from './WorkflowStepsService';
 import StudyPrefetcherService from './StudyPrefetcherService';
 import { MultiMonitorService } from './MultiMonitorService';
-import TrackingService from './TrackingService';
+// TrackingService moved to extensions/default
 
 import type Services from '../types/Services';
 
@@ -45,5 +45,5 @@ export {
   PanelService,
   WorkflowStepsService,
   StudyPrefetcherService,
-  TrackingService,
+  // TrackingService - now registered by extensions/default
 };

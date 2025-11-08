@@ -4,6 +4,7 @@ import { calculateSUVScalingFactors } from '@cornerstonejs/calculate-suv';
 import getPTImageIdInstanceMetadata from './getPTImageIdInstanceMetadata';
 import { registerHangingProtocolAttributes } from './hangingprotocols';
 import { HotkeysManager } from '@ohif/core';
+import TrackingService from './services/TrackingService';
 
 const metadataProvider = classes.MetadataProvider;
 
@@ -17,6 +18,9 @@ export default function init({
   commandsManager,
   hotkeysManager,
 }: withAppTypes): void {
+  // Register TrackingService
+  servicesManager.registerService(TrackingService.REGISTRATION);
+
   const { toolbarService, cineService, viewportGridService } = servicesManager.services;
 
   toolbarService.registerEventForToolbarUpdate(cineService, [

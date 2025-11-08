@@ -160,7 +160,7 @@ class NavigationController {
     // Throttle UI updates to target FPS
     const now = performance.now();
     const timeSinceLastRender = now - this.lastRenderTime;
-    
+
     if (timeSinceLastRender < this.minFrameTime) {
       // Skip this frame - too soon since last render
       if (this.updateCount % 100 === 0) {
@@ -184,7 +184,7 @@ class NavigationController {
       const elapsed = (now - this.lastUpdateTime) / 1000;
       const dataHz = this.updateCount / elapsed;
       const renderHz = 1000 / timeSinceLastRender;
-      
+
       if (this.coordinateTransformer.hasTransform() && !this.coordinateTransformer.isIdentityTransform()) {
         console.log(`🔄 Update #${this.updateCount} | Data: ${dataHz.toFixed(1)} Hz | UI: ${renderHz.toFixed(1)} Hz`);
         console.log(`   Register: [${registerPosition.map(v => v.toFixed(1)).join(', ')}]`);
@@ -586,13 +586,13 @@ class NavigationController {
    */
   public getStatus() {
     const transform = this.coordinateTransformer.getTransform();
-    
+
     return {
       navigating: this.isNavigating,
       updateCount: this.updateCount,
       targetFPS: this.targetFPS,
-      actualFPS: this.lastRenderTime > 0 
-        ? 1000 / (performance.now() - this.lastRenderTime) 
+      actualFPS: this.lastRenderTime > 0
+        ? 1000 / (performance.now() - this.lastRenderTime)
         : 0,
       transformation: {
         loaded: this.coordinateTransformer.hasTransform(),

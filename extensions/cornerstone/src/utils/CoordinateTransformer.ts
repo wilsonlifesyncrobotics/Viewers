@@ -1,15 +1,15 @@
 /**
  * Coordinate Transformer
- * 
+ *
  * Transforms tracking data from register (r) coordinates to DICOM (d) coordinates
  * Uses the rMd transformation matrix from case.json
- * 
+ *
  * Coordinate Systems:
  * - Register (r): Surgical planning frame (from CT/MRI)
  * - Tracker (t): Optical tracker frame
  * - Patient Reference (pr): Patient-attached marker frame
  * - DICOM (d): Medical imaging frame (what OHIF uses)
- * 
+ *
  * Transformation: dPos = inv(rMd) @ rPos
  */
 
@@ -56,9 +56,9 @@ class CoordinateTransformer {
 
   /**
    * Transform position from register (r) to DICOM (d) coordinates
-   * 
+   *
    * dPos = inv(rMd) @ rPos
-   * 
+   *
    * Why inverse? Because rMd goes from register TO DICOM frame,
    * but we have positions in register and need them in DICOM.
    */
@@ -86,7 +86,7 @@ class CoordinateTransformer {
 
   /**
    * Transform position from DICOM (d) to register (r) coordinates
-   * 
+   *
    * rPos = rMd @ dPos
    */
   public dicomToRegister(dPos: number[]): number[] {
@@ -301,4 +301,3 @@ class CoordinateTransformer {
 }
 
 export default CoordinateTransformer;
-

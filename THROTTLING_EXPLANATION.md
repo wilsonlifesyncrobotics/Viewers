@@ -56,7 +56,7 @@ class NavigationController {
   private _handleTrackingUpdate(event: any): void {
     const now = performance.now();
     const timeSinceLastRender = now - this.lastRenderTime;
-    
+
     // Throttle: Skip if too soon since last render
     if (timeSinceLastRender < this.minFrameTime) {
       return;  // ← 75% of frames skipped (100Hz → 25Hz)
@@ -157,12 +157,12 @@ Throttle Ratio = 100 / 25 = 4 (skip 3 out of 4 frames)
 
 ## Benefits Summary
 
-✅ **4x lower CPU usage** - Browser stays responsive  
-✅ **Smooth rendering** - Consistent frame times  
-✅ **No data loss** - All tracking data received  
-✅ **Low latency** - Still 10ms end-to-end  
-✅ **Configurable** - Adjust for different hardware  
-✅ **Production ready** - Stable for long sessions  
+✅ **4x lower CPU usage** - Browser stays responsive
+✅ **Smooth rendering** - Consistent frame times
+✅ **No data loss** - All tracking data received
+✅ **Low latency** - Still 10ms end-to-end
+✅ **Configurable** - Adjust for different hardware
+✅ **Production ready** - Stable for long sessions
 
 ---
 
@@ -213,15 +213,14 @@ console.log('UI Rate:', controller.getStatus().actualFPS, 'Hz');
 
 ## Summary
 
-**Problem:** 100 Hz UI updates = high CPU + poor UX  
-**Solution:** Throttle to 25 Hz = smooth + efficient  
-**Result:** 4x better performance, no compromises  
+**Problem:** 100 Hz UI updates = high CPU + poor UX
+**Solution:** Throttle to 25 Hz = smooth + efficient
+**Result:** 4x better performance, no compromises
 
 **Default: 25 Hz is the sweet spot** ✅
 
 ---
 
-**Version:** 1.0  
-**Date:** 2025-11-08  
+**Version:** 1.0
+**Date:** 2025-11-08
 **Status:** Production Ready
-

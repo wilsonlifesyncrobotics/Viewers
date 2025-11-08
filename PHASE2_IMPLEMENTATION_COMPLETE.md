@@ -340,8 +340,7 @@ See: `OHIF_TRACKING_INTEGRATION_PLAN.md` for full roadmap
 
 ---
 
-**Version:** 2.0  
-**Status:** Phase 2 Complete  
-**Date:** 2025-11-08  
+**Version:** 2.0
+**Status:** Phase 2 Complete
+**Date:** 2025-11-08
 **Next:** Phase 3 - Crosshair Integration & Coordinate Transforms
-

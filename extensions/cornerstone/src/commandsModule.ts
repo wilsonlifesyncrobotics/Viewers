@@ -2147,27 +2147,36 @@ function commandsModule({
       }
 
       // Import NavigationController dynamically
-      import('./utils/navigationController').then(({ default: NavigationController }) => {
-        // Create or get singleton instance
-        if (!window.__navigationController) {
-          window.__navigationController = new NavigationController(servicesManager);
-        }
+      import('./utils/navigationController')
+        .then(({ default: NavigationController }) => {
+          // Create or get singleton instance
+          if (!window.__navigationController) {
+            window.__navigationController = new NavigationController(servicesManager);
+          }
 
-        // Connect to tracking server
-        trackingService.connect();
+          // Connect to tracking server and start navigation
+          return trackingService.connect();
+        })
+        .then(() => {
+          // Start navigation after connection is established
+          window.__navigationController.startNavigation(mode);
 
-        // Start navigation
-        window.__navigationController.startNavigation(mode);
-
-        uiNotificationService?.show({
-          title: 'Navigation Started',
-          message: `Navigation mode: ${mode}`,
-          type: 'success',
-          duration: 2000,
+          uiNotificationService?.show({
+            title: 'Navigation Started',
+            message: `Navigation mode: ${mode}`,
+            type: 'success',
+            duration: 2000,
+          });
+        })
+        .catch(error => {
+          console.error('❌ Failed to start navigation:', error);
+          uiNotificationService?.show({
+            title: 'Navigation Error',
+            message: error.message || 'Failed to start navigation',
+            type: 'error',
+            duration: 3000,
+          });
         });
-      }).catch(error => {
-        console.error('❌ Failed to load NavigationController:', error);
-      });
     },
     /**
      * Stop Navigation Mode

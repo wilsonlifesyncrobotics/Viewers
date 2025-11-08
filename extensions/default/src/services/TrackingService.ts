@@ -2,7 +2,7 @@
  * TrackingService
  * Connects to SyncForge tracking API via REST + WebSocket
  * Updates crosshair position at 100Hz for real-time navigation
- * 
+ *
  * Phase 2: Updated for integrated SyncForge API
  */
 
@@ -79,7 +79,7 @@ class TrackingService extends PubSubService {
       }
 
       const data = await response.json();
-      
+
       if (!data.success || !data.websocket_url) {
         throw new Error('API did not return WebSocket URL');
       }
@@ -252,12 +252,12 @@ class TrackingService extends PubSubService {
         // NEW FORMAT: Extract data from tools object
         if (message.tools && message.tools.crosshair) {
           const crosshair = message.tools.crosshair;
-          
+
           // Extract position, orientation, and matrix
           const position = crosshair.coordinates.register.position_mm;
           const rotation = crosshair.coordinates.register.rotation_deg || [0, 0, 0];
           const matrix = crosshair.coordinates.register.rMcrosshair;
-          
+
           // Pass to tracking update handler
           this._handleTrackingUpdate({
             position: position,
@@ -323,4 +323,3 @@ class TrackingService extends PubSubService {
 
 export default TrackingService;
 export { EVENTS as TRACKING_EVENTS };
-
