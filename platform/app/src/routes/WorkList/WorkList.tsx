@@ -34,7 +34,403 @@ import {
   Onboarding,
   ScrollArea,
   InvestigationalUseDialog,
+  Button as ButtonNext,
 } from '@ohif/ui-next';
+
+// Case Creation Dialog
+const CreateCaseDialog = ({ isOpen, onClose, onCreateCase, servicesManager }) => {
+  const [formData, setFormData] = React.useState({
+    caseId: '',
+    patientName: '',
+    patientMRN: '',
+    caseName: '',
+    surgeryDate: '',
+    description: '',
+  });
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  const handleCreate = async () => {
+    if (!formData.caseId || !formData.patientMRN) {
+      setError('Case ID and Patient MRN are required');
+      return;
+    }
+
+    setIsCreating(true);
+    setError(null);
+
+    try {
+      const caseData = {
+        caseId: formData.caseId,
+        caseName: formData.caseName || formData.caseId,
+        patientInfo: {
+          name: formData.patientName,
+          mrn: formData.patientMRN,
+        },
+        surgeryDate: formData.surgeryDate || null,
+        description: formData.description || '',
+        studies: [],
+        primaryReference: null,
+      };
+
+      await onCreateCase(caseData);
+
+      // Reset form
+      setFormData({
+        caseId: '',
+        patientName: '',
+        patientMRN: '',
+        caseName: '',
+        surgeryDate: '',
+        description: '',
+      });
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to create case');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-secondary-dark border-secondary-light w-full max-w-lg rounded-lg border p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-white">Create New Case</h2>
+          <button
+            onClick={onClose}
+            className="text-primary-light hover:text-white"
+          >
+            <Icons.Close className="h-5 w-5" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded bg-red-500 bg-opacity-20 p-3 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-primary-light mb-1 block text-sm font-medium">
+              Case ID *
+            </label>
+            <input
+              type="text"
+              value={formData.caseId}
+              onChange={(e) => setFormData({ ...formData, caseId: e.target.value })}
+              placeholder="e.g., CASE-2025-001"
+              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-primary-light mb-1 block text-sm font-medium">
+              Patient MRN *
+            </label>
+            <input
+              type="text"
+              value={formData.patientMRN}
+              onChange={(e) => setFormData({ ...formData, patientMRN: e.target.value })}
+              placeholder="Medical Record Number"
+              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-primary-light mb-1 block text-sm font-medium">
+              Patient Name
+            </label>
+            <input
+              type="text"
+              value={formData.patientName}
+              onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
+              placeholder="Patient full name"
+              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-primary-light mb-1 block text-sm font-medium">
+              Case Name
+            </label>
+            <input
+              type="text"
+              value={formData.caseName}
+              onChange={(e) => setFormData({ ...formData, caseName: e.target.value })}
+              placeholder="Optional - defaults to Case ID"
+              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-primary-light mb-1 block text-sm font-medium">
+              Surgery Date
+            </label>
+            <input
+              type="date"
+              value={formData.surgeryDate}
+              onChange={(e) => setFormData({ ...formData, surgeryDate: e.target.value })}
+              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-primary-light mb-1 block text-sm font-medium">
+              Description
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Optional case description"
+              rows={3}
+              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <ButtonNext
+            variant="ghost"
+            onClick={onClose}
+            disabled={isCreating}
+          >
+            Cancel
+          </ButtonNext>
+          <ButtonNext
+            onClick={handleCreate}
+            disabled={isCreating}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {isCreating ? 'Creating...' : 'Create Case'}
+          </ButtonNext>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Simplified Case Selector for WorkList
+const WorkListCaseSelector = ({ servicesManager }) => {
+  const [cases, setCases] = React.useState([]);
+  const [activeCaseId, setActiveCaseId] = React.useState(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = React.useState(false);
+  const caseService = servicesManager?.services?.caseService;
+
+  const loadCases = async () => {
+    if (!caseService) return;
+    try {
+      const fetchedCases = await caseService.getCases();
+      setCases(fetchedCases);
+    } catch (err) {
+      console.warn('Failed to load cases:', err);
+    }
+  };
+
+  React.useEffect(() => {
+    if (!caseService) return;
+
+    loadCases();
+    const initialCaseId = caseService.getActiveCaseId();
+    setActiveCaseId(initialCaseId);
+
+    const unsubscribe = caseService.subscribe(
+      caseService.constructor.EVENTS.ACTIVE_CASE_CHANGED,
+      ({ caseId }) => setActiveCaseId(caseId)
+    );
+
+    return () => unsubscribe?.unsubscribe();
+  }, [caseService]);
+
+  const handleCreateCase = async (caseData) => {
+    if (!caseService) return;
+    await caseService.createCase(caseData);
+    await loadCases(); // Reload cases
+    caseService.setActiveCaseId(caseData.caseId); // Auto-select new case
+  };
+
+  if (!caseService) {
+    return null;
+  }
+
+  const activeCase = cases.find(c => c.caseId === activeCaseId);
+
+  return (
+    <>
+      <div className="flex items-center gap-2 px-4">
+        <span className="text-primary-light text-sm font-medium">Surgical Case:</span>
+        <select
+          value={activeCaseId || ''}
+          onChange={(e) => caseService.setActiveCaseId(e.target.value || null)}
+          className="bg-primary-dark hover:bg-primary text-primary-active border-primary-light min-w-[200px] rounded border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">No Case Selected (View All Studies)</option>
+          {cases.map(caseItem => (
+            <option key={caseItem.caseId} value={caseItem.caseId}>
+              {caseItem.caseName || caseItem.caseId} - {caseItem.patientInfo.name || caseItem.patientInfo.mrn}
+            </option>
+          ))}
+        </select>
+        {activeCase && (
+          <span className="text-primary-light text-xs">
+            ({activeCase.studyCount || 0} studies)
+          </span>
+        )}
+        <ButtonNext
+          size="sm"
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 ml-2"
+        >
+          <Icons.Add className="mr-1 h-4 w-4" />
+          Create Case
+        </ButtonNext>
+      </div>
+
+      <CreateCaseDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onCreateCase={handleCreateCase}
+        servicesManager={servicesManager}
+      />
+    </>
+  );
+};
+
+// API Configuration Panel
+const ApiConfigPanel = ({ servicesManager }) => {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [apiUrl, setApiUrl] = React.useState('');
+  const [tempUrl, setTempUrl] = React.useState('');
+  const [connectionStatus, setConnectionStatus] = React.useState({ case: false, registration: false });
+
+  const caseService = servicesManager?.services?.caseService;
+  const registrationService = servicesManager?.services?.registrationService;
+
+  React.useEffect(() => {
+    // Load saved URL from localStorage
+    const savedUrl = localStorage.getItem('syncforge_api_url');
+    const defaultUrl = 'http://localhost:3001';
+
+    if (savedUrl) {
+      setApiUrl(savedUrl);
+      setTempUrl(savedUrl);
+    } else {
+      setApiUrl(defaultUrl);
+      setTempUrl(defaultUrl);
+    }
+
+    // Subscribe to connection status changes
+    if (caseService) {
+      const unsubCase = caseService.subscribe(
+        caseService.constructor.EVENTS.CONNECTION_STATUS,
+        ({ connected }) => {
+          setConnectionStatus(prev => ({ ...prev, case: connected }));
+        }
+      );
+
+      return () => unsubCase?.unsubscribe();
+    }
+  }, [caseService]);
+
+  const handleApply = () => {
+    const cleanUrl = tempUrl.replace(/\/$/, '');
+    setApiUrl(cleanUrl);
+    localStorage.setItem('syncforge_api_url', cleanUrl);
+
+    // Update both services
+    if (caseService) {
+      caseService.setApiUrl(cleanUrl);
+    }
+    if (registrationService) {
+      registrationService.setApiUrl(cleanUrl);
+    }
+  };
+
+  const handleReset = () => {
+    const defaultUrl = 'http://localhost:3001';
+    setTempUrl(defaultUrl);
+    setApiUrl(defaultUrl);
+    localStorage.removeItem('syncforge_api_url');
+
+    if (caseService) {
+      caseService.setApiUrl(defaultUrl);
+    }
+    if (registrationService) {
+      registrationService.setApiUrl(defaultUrl);
+    }
+  };
+
+  if (!caseService && !registrationService) {
+    return null;
+  }
+
+  return (
+    <div className="bg-secondary-dark border-secondary-light mx-4 mt-2 rounded border">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="hover:bg-secondary-main flex w-full items-center justify-between px-4 py-2 text-left transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Icons.Settings className="h-4 w-4" />
+          <span className="text-primary-light text-sm font-medium">SyncForge API Configuration</span>
+          <div className="flex items-center gap-2 ml-3">
+            <div className={`h-2 w-2 rounded-full ${connectionStatus.case ? 'bg-green-500' : 'bg-red-500'}`} title="Case Management API" />
+            <span className="text-xs text-gray-400">{apiUrl}</span>
+          </div>
+        </div>
+        <Icons.ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isExpanded && (
+        <div className="border-t border-secondary-light px-4 py-3 space-y-3">
+          <div className="space-y-2">
+            <label className="text-primary-light text-xs font-medium">API URL (for ngrok or remote access)</label>
+            <input
+              type="text"
+              value={tempUrl}
+              onChange={(e) => setTempUrl(e.target.value)}
+              placeholder="https://your-ngrok-url.ngrok-free.app"
+              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <ButtonNext
+              size="sm"
+              onClick={handleApply}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Apply
+            </ButtonNext>
+            <ButtonNext
+              variant="ghost"
+              size="sm"
+              onClick={handleReset}
+            >
+              Reset to Default
+            </ButtonNext>
+          </div>
+
+          <div className="text-xs text-gray-400 space-y-1">
+            <p><strong>Local Development:</strong></p>
+            <p className="pl-4">• Default: http://localhost:3001 (direct API access)</p>
+            <p className="pl-4">• With nginx: http://localhost:8080/api (proxied, more secure)</p>
+            <p><strong>Remote Access (Recommended - nginx):</strong></p>
+            <p className="pl-4">1. Run: <code className="bg-gray-800 px-1 rounded">ngrok http 8080</code></p>
+            <p className="pl-4">2. Leave this field at default (API auto-routed via nginx)</p>
+            <p className="pl-4">3. Access OHIF via ngrok URL - API included automatically</p>
+            <p><strong>Remote Access (Legacy - direct):</strong></p>
+            <p className="pl-4">1. Run: <code className="bg-gray-800 px-1 rounded">ngrok http 3001</code></p>
+            <p className="pl-4">2. Copy the HTTPS URL and paste above</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 import { Types } from '@ohif/ui';
 
@@ -64,6 +460,10 @@ function WorkList({
   const { t } = useTranslation();
   // ~ Modes
   const [appConfig] = useAppConfig();
+  // ~ Case Filtering
+  const [activeCase, setActiveCase] = useState(null);
+  const [activeCaseId, setActiveCaseId] = useState(null);
+  const caseService = servicesManager?.services?.caseService;
   // ~ Filters
   const searchParams = useSearchParams();
   const navigate = useNavigate();
@@ -127,6 +527,16 @@ function WorkList({
     });
   }, [canSort, studies, shouldUseDefaultSort, sortBy, sortModifier]);
 
+  // Filter studies by active case
+  const filteredStudies = useMemo(() => {
+    if (!activeCaseId || !activeCase) {
+      return sortedStudies;
+    }
+
+    const caseStudyUIDs = activeCase.studies.map(s => s.studyInstanceUID);
+    return sortedStudies.filter(study => caseStudyUIDs.includes(study.studyInstanceUid));
+  }, [sortedStudies, activeCaseId, activeCase]);
+
   // ~ Rows & Studies
   const [expandedRows, setExpandedRows] = useState([]);
   const [studiesWithSeriesData, setStudiesWithSeriesData] = useState([]);
@@ -173,6 +583,35 @@ function WorkList({
       document.body.classList.remove('bg-black');
     };
   }, []);
+
+  // Subscribe to case service changes
+  useEffect(() => {
+    if (!caseService) {
+      return;
+    }
+
+    // Load initial active case
+    const initialCaseId = caseService.getActiveCaseId();
+    const initialCase = caseService.getActiveCase();
+    setActiveCaseId(initialCaseId);
+    setActiveCase(initialCase);
+
+    // Subscribe to case changes
+    const unsubscribe = caseService.subscribe(
+      caseService.constructor.EVENTS.ACTIVE_CASE_CHANGED,
+      ({ caseId, case: caseData }) => {
+        setActiveCaseId(caseId);
+        setActiveCase(caseData);
+        console.log('📁 WorkList: Active case changed:', caseId);
+      }
+    );
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe.unsubscribe();
+      }
+    };
+  }, [caseService]);
 
   // Sync URL query parameters with filters
   useEffect(() => {
@@ -230,7 +669,7 @@ function WorkList({
     // Note: expanded rows index begins at 1
     for (let z = 0; z < expandedRows.length; z++) {
       const expandedRowIndex = expandedRows[z] - 1;
-      const studyInstanceUid = sortedStudies[expandedRowIndex].studyInstanceUid;
+      const studyInstanceUid = filteredStudies[expandedRowIndex].studyInstanceUid;
 
       if (studiesWithSeriesData.includes(studyInstanceUid)) {
         continue;
@@ -250,7 +689,7 @@ function WorkList({
   const rollingPageNumber = (pageNumber - 1) % rollingPageNumberMod;
   const offset = resultsPerPage * rollingPageNumber;
   const offsetAndTake = offset + resultsPerPage;
-  const tableDataSource = sortedStudies.map((study, key) => {
+  const tableDataSource = filteredStudies.map((study, key) => {
     const rowKey = key + 1;
     const isExpanded = expandedRows.some(k => k === rowKey);
     const {
@@ -294,6 +733,11 @@ function WorkList({
       );
     };
 
+    // Get clinical phase if study is in active case
+    const studyInfo = activeCaseId && activeCase ?
+      activeCase.studies.find(s => s.studyInstanceUID === studyInstanceUid) : null;
+    const clinicalPhase = studyInfo?.clinicalPhase;
+
     return {
       dataCY: `studyRow-${studyInstanceUid}`,
       clickableCY: studyInstanceUid,
@@ -321,7 +765,16 @@ function WorkList({
         },
         {
           key: 'description',
-          content: makeCopyTooltipCell(description),
+          content: (
+            <div className="flex items-center gap-2">
+              {makeCopyTooltipCell(description)}
+              {clinicalPhase && (
+                <span className="bg-blue-900/40 text-blue-300 border-blue-500 rounded border px-2 py-0.5 text-xs whitespace-nowrap">
+                  {clinicalPhase.replace(/([A-Z])/g, ' $1').trim()}
+                </span>
+              )}
+            </div>
+          ),
           gridCol: 4,
         },
         {
@@ -558,7 +1011,9 @@ function WorkList({
         isReturnEnabled={false}
         WhiteLabeling={appConfig.whiteLabeling}
         showPatientInfo={PatientInfoVisibility.DISABLED}
+        Secondary={<WorkListCaseSelector servicesManager={servicesManager} />}
       />
+      <ApiConfigPanel servicesManager={servicesManager} />
       <Onboarding />
       <InvestigationalUseDialog dialogConfiguration={appConfig?.investigationalUseDialog} />
       <div className="flex h-full flex-col overflow-y-auto">
@@ -579,6 +1034,30 @@ function WorkList({
               }
             />
           </div>
+          {activeCaseId && activeCase && (
+            <div className="bg-blue-900/20 border-blue-500 text-blue-300 mx-4 mb-2 flex items-center justify-between rounded border p-3">
+              <div className="flex items-center gap-3">
+                <Icons.Info className="h-5 w-5" />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">
+                    Filtering studies for case: {activeCase.caseId}
+                  </span>
+                  <span className="text-xs opacity-80">
+                    Patient: {activeCase.patientInfo.name || activeCase.patientInfo.mrn} • {activeCase.studies.length} enrolled {activeCase.studies.length === 1 ? 'study' : 'studies'}
+                  </span>
+                </div>
+              </div>
+              <ButtonNext
+                variant="ghost"
+                size="sm"
+                onClick={() => caseService.setActiveCaseId(null)}
+                className="hover:bg-blue-800"
+              >
+                <Icons.Close className="mr-1 h-4 w-4" />
+                Clear Filter
+              </ButtonNext>
+            </div>
+          )}
           {hasStudies ? (
             <div className="flex grow flex-col">
               <StudyListTable

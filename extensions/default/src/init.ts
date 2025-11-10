@@ -5,6 +5,8 @@ import getPTImageIdInstanceMetadata from './getPTImageIdInstanceMetadata';
 import { registerHangingProtocolAttributes } from './hangingprotocols';
 import { HotkeysManager } from '@ohif/core';
 import TrackingService from './services/TrackingService';
+import RegistrationService from './services/RegistrationService';
+import CaseService from './services/CaseService';
 
 const metadataProvider = classes.MetadataProvider;
 
@@ -20,6 +22,12 @@ export default function init({
 }: withAppTypes): void {
   // Register TrackingService
   servicesManager.registerService(TrackingService.REGISTRATION);
+
+  // Register RegistrationService
+  servicesManager.registerService(RegistrationService.REGISTRATION);
+
+  // Register CaseService
+  servicesManager.registerService(CaseService.REGISTRATION);
 
   const { toolbarService, cineService, viewportGridService } = servicesManager.services;
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { WrappedPanelStudyBrowser } from './Panels';
 import TrackingPanel from './Panels/TrackingPanel';
+import RegistrationPanel from './Panels/RegistrationPanel';
 import i18n from 'i18next';
 
 // TODO:
@@ -30,6 +31,13 @@ function getPanelModule({ commandsManager, extensionManager, servicesManager }) 
       iconLabel: 'Nav',
       label: 'Nav',
       component: TrackingPanel,
+    },
+    {
+      name: 'registrationPanel',
+      iconName: 'tool-create-threshold',
+      iconLabel: 'Reg',
+      label: 'Registration',
+      component: RegistrationPanel,
     },
   ];
 }

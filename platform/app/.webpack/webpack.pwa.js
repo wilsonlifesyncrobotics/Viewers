@@ -160,6 +160,8 @@ module.exports = (env, argv) => {
       // open: true,
       open: false,
       port: OHIF_PORT,
+      // Allow access from ngrok and other remote hosts
+      allowedHosts: 'all',
       client: {
         overlay: { errors: true, warnings: false },
       },
