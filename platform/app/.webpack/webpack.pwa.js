@@ -158,18 +158,23 @@ module.exports = (env, argv) => {
       // http2: true,
       // https: true,
       // open: true,
-      open: {
-        app: {
-          name: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-        },
-      },
+      open: false,
       port: OHIF_PORT,
+      // Allow access from ngrok and other remote hosts
+      allowedHosts: 'all',
       client: {
         overlay: { errors: true, warnings: false },
       },
       proxy: [
         {
-          '/dicomweb': 'http://localhost:5000',
+          context: ['/dicom-web'],
+          target: 'http://localhost:8042',
+          changeOrigin: true,
+          secure: false,
+          auth: 'lsr:lsr#!$!59',
+          headers: {
+            Authorization: 'Basic ' + Buffer.from('lsr:lsr#!$!59').toString('base64'),
+          },
         },
         {
           // Proxy for 3D model server - API endpoints

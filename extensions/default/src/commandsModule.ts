@@ -2,6 +2,7 @@ import { Types, DicomMetadataStore } from '@ohif/core';
 
 import { ContextMenuController } from './CustomizableContextMenu';
 import DicomTagBrowser from './DicomTagBrowser/DicomTagBrowser';
+import StudyEnrollmentDialog from './Panels/StudyEnrollmentDialog';
 import reuseCachedLayouts from './utils/reuseCachedLayouts';
 import {
   configureViewportForLayerAddition,
@@ -761,6 +762,35 @@ const commandsModule = ({
 
       setTimeout(() => actions.scrollActiveThumbnailIntoView(), 0);
     },
+
+    enrollStudyInCase: ({ studyInstanceUID, studyData }) => {
+      const { uiModalService } = servicesManager.services;
+
+      if (!studyInstanceUID) {
+        console.warn('Missing studyInstanceUID for enrollStudyInCase command');
+        return;
+      }
+
+      uiModalService.show({
+        title: 'Enroll Study in Case',
+        content: StudyEnrollmentDialog,
+        contentProps: {
+          servicesManager,
+          studyInstanceUID,
+          studyData,
+          onClose: () => uiModalService.hide(),
+          onSuccess: () => {
+            uiNotificationService.show({
+              title: 'Study Enrolled',
+              message: 'Study has been enrolled in the case successfully',
+              type: 'success',
+              duration: 3000,
+            });
+          },
+        },
+        containerClassName: 'max-w-md',
+      });
+    },
   };
 
   const definitions = {
@@ -789,6 +819,7 @@ const commandsModule = ({
     scrollActiveThumbnailIntoView: actions.scrollActiveThumbnailIntoView,
     addDisplaySetAsLayer: actions.addDisplaySetAsLayer,
     removeDisplaySetLayer: actions.removeDisplaySetLayer,
+    enrollStudyInCase: actions.enrollStudyInCase,
   };
 
   return {

@@ -44,6 +44,7 @@ import { isMeasurementWithinViewport } from './utils/isMeasurementWithinViewport
 import { getCenterExtent } from './utils/getCenterExtent';
 import { EasingFunctionEnum } from './utils/transitions';
 import { ModelUpload } from './components/ModelUpload';
+import { addFiducialAtCrosshair } from './utils/addFiducialAtCrosshair';
 
 const { DefaultHistoryMemo } = csUtils.HistoryMemo;
 const toggleSyncFunctions = {
@@ -151,6 +152,54 @@ function commandsModule({
     jumpToMeasurementViewport: ({ annotationUID, measurement }) => {
       cornerstoneTools.annotation.selection.setAnnotationSelected(annotationUID, true);
       const { metadata } = measurement;
+
+      // Special handling for FiducialMarker - jump directly to position
+      if (measurement.toolName === 'FiducialMarker') {
+        console.log('🎯 FiducialMarker clicked - Jumping to fiducial position');
+
+        // Get the fiducial's world position
+        const annotation = cornerstoneTools.annotation.state.getAnnotation(annotationUID);
+        if (annotation?.data?.handles?.points?.[0]) {
+          const fiducialWorldPosition = annotation.data.handles.points[0];
+          console.log('📍 Fiducial world position:', fiducialWorldPosition);
+
+          // Move all viewports' cameras to the fiducial position
+          const { viewports } = viewportGridService.getState();
+          const viewportIds = Array.from(viewports.keys());
+          viewportIds.forEach(vpId => {
+            const viewport = cornerstoneViewportService.getCornerstoneViewport(vpId);
+            if (viewport) {
+              const camera = viewport.getCamera();
+              const { position: cameraPosition, focalPoint: cameraFocalPoint } = camera;
+
+              // Calculate new camera position maintaining the same viewing direction
+              const viewDirection = vec3.sub(vec3.create(), cameraPosition, cameraFocalPoint);
+              const newPosition = vec3.add(vec3.create(), fiducialWorldPosition, viewDirection);
+
+              viewport.setCamera({
+                focalPoint: fiducialWorldPosition,
+                position: newPosition as any
+              });
+              viewport.render();
+            }
+          });
+
+          // Move crosshairs to fiducial position
+          const toolGroupIds = toolGroupService.getToolGroupIds();
+          toolGroupIds.forEach(toolGroupId => {
+            const toolGroup = toolGroupService.getToolGroup(toolGroupId);
+            const crosshairInstance = toolGroup?.getToolInstance?.('Crosshairs');
+
+            if (crosshairInstance && typeof crosshairInstance.setToolCenter === 'function') {
+              console.log(`🎯 Moving crosshairs in tool group ${toolGroupId} to fiducial position`);
+              crosshairInstance.setToolCenter(fiducialWorldPosition, false);
+            }
+          });
+        } else {
+          console.warn('⚠️ Could not find fiducial position in annotation data');
+        }
+        return;
+      }
 
       const activeViewportId = viewportGridService.getActiveViewportId();
       // Finds the best viewport to jump to for showing the annotation view reference
@@ -2078,6 +2127,260 @@ function commandsModule({
         console.error('❌ [showModelUploadModal] Error stack:', error.stack);
       }
     },
+    /**
+     * Start Navigation Mode
+     * Connects to tracking server and starts receiving position updates at 20Hz
+     */
+    startNavigation: ({ mode = 'circular' }) => {
+      console.log('🧭 [startNavigation] Starting navigation mode:', mode);
+
+      const { trackingService } = servicesManager.services;
+
+      if (!trackingService) {
+        console.error('❌ TrackingService not available');
+        uiNotificationService?.show({
+          title: 'Navigation Error',
+          message: 'Tracking service is not available',
+          type: 'error',
+        });
+        return;
+      }
+
+      // Import NavigationController dynamically
+      import('./utils/navigationController')
+        .then(({ default: NavigationController }) => {
+          // Create or get singleton instance
+          if (!window.__navigationController) {
+            window.__navigationController = new NavigationController(servicesManager);
+          }
+
+          // Connect to tracking server and start navigation
+          return trackingService.connect();
+        })
+        .then(() => {
+          // Start navigation after connection is established
+          window.__navigationController.startNavigation(mode);
+
+          uiNotificationService?.show({
+            title: 'Navigation Started',
+            message: `Navigation mode: ${mode}`,
+            type: 'success',
+            duration: 2000,
+          });
+        })
+        .catch(error => {
+          console.error('❌ Failed to start navigation:', error);
+          uiNotificationService?.show({
+            title: 'Navigation Error',
+            message: error.message || 'Failed to start navigation',
+            type: 'error',
+            duration: 3000,
+          });
+        });
+    },
+    /**
+     * Stop Navigation Mode
+     */
+    stopNavigation: () => {
+      console.log('🛑 [stopNavigation] Stopping navigation');
+
+      const { trackingService } = servicesManager.services;
+
+      if (window.__navigationController) {
+        window.__navigationController.stopNavigation();
+
+        uiNotificationService?.show({
+          title: 'Navigation Stopped',
+          message: 'Navigation mode deactivated',
+          type: 'info',
+          duration: 2000,
+        });
+      }
+
+      if (trackingService) {
+        trackingService.disconnect();
+      }
+    },
+    /**
+     * Toggle Navigation Mode
+     */
+    toggleNavigation: ({ mode = 'circular' }) => {
+      console.log('🔄 [toggleNavigation] Toggling navigation');
+
+      if (window.__navigationController?.getStatus().navigating) {
+        commandsManager.runCommand('stopNavigation');
+      } else {
+        commandsManager.runCommand('startNavigation', { mode });
+      }
+    },
+    /**
+     * Set tracking center to current crosshair position
+     */
+    setTrackingCenter: () => {
+      console.log('📍 [setTrackingCenter] Setting tracking center');
+
+      if (window.__navigationController) {
+        window.__navigationController.setCenterToCurrentPosition();
+      }
+    },
+    /**
+     * Add fiducial marker at current crosshair position
+     */
+    addFiducialAtCrosshair: () => {
+      console.log('🎯 [addFiducialAtCrosshair] Adding fiducial marker');
+
+      const success = addFiducialAtCrosshair(servicesManager);
+
+      if (success) {
+        uiNotificationService?.show({
+          title: 'Fiducial Added',
+          message: 'Marker placed at crosshair position',
+          type: 'success',
+          duration: 2000,
+        });
+      } else {
+        uiNotificationService?.show({
+          title: 'Error',
+          message: 'Could not place fiducial marker',
+          type: 'error',
+          duration: 3000,
+        });
+      }
+    },
+
+    /**
+     * Save all measurements to JSON file in surgical_case directory
+     */
+    saveMeasurementsJSON: async () => {
+      console.log('💾 [saveMeasurementsJSON] Saving measurements to JSON');
+
+      const { measurementService, displaySetService } = servicesManager.services;
+      const measurements = measurementService.getMeasurements();
+
+      // Debug: Log first measurement to see available fields
+      if (measurements && measurements.length > 0) {
+        console.log('🔍 First measurement structure:', measurements[0]);
+        console.log('🔍 Available keys:', Object.keys(measurements[0]));
+      }
+
+      if (!measurements || measurements.length === 0) {
+        uiNotificationService?.show({
+          title: 'No Measurements',
+          message: 'No measurements to save',
+          type: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Get Study/Series UIDs from first measurement
+      const firstMeasurement = measurements[0];
+      const studyInstanceUID = firstMeasurement.referenceStudyUID;
+      const seriesInstanceUID = firstMeasurement.referenceSeriesUID;
+
+      if (!studyInstanceUID || !seriesInstanceUID) {
+        uiNotificationService?.show({
+          title: 'Error',
+          message: 'Could not determine study/series IDs',
+          type: 'error',
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Use the saveMeasurementsJSON utility
+      const { saveMeasurementsJSON } = await import('@ohif/core/src/utils/saveMeasurementsJSON');
+      const result = await saveMeasurementsJSON(measurements, studyInstanceUID, seriesInstanceUID);
+
+      if (result) {
+        uiNotificationService?.show({
+          title: 'Measurements Saved',
+          message: `${measurements.length} measurements saved to JSON`,
+          type: 'success',
+          duration: 3000,
+        });
+      } else {
+        uiNotificationService?.show({
+          title: 'Save Failed',
+          message: 'Could not save measurements (check console)',
+          type: 'error',
+          duration: 3000,
+        });
+      }
+    },
+
+    /**
+     * Load measurements from JSON file in surgical_case directory
+     */
+    loadMeasurementsJSON: async () => {
+      console.log('📂 [loadMeasurementsJSON] Loading measurements from JSON');
+
+      const { displaySetService } = servicesManager.services;
+
+      // Get active viewport to determine Study/Series UIDs
+      const { viewport } = _getActiveViewportEnabledElement();
+      if (!viewport) {
+        uiNotificationService?.show({
+          title: 'No Active Viewport',
+          message: 'Please open a study first',
+          type: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
+
+      // Get display set from active viewport
+      const displaySets = displaySetService.getActiveDisplaySets();
+      if (!displaySets || displaySets.length === 0) {
+        uiNotificationService?.show({
+          title: 'No Display Set',
+          message: 'Could not determine active study/series',
+          type: 'warning',
+          duration: 3000,
+        });
+        return;
+      }
+
+      const displaySet = displaySets[0];
+      const studyInstanceUID = displaySet.StudyInstanceUID;
+      const seriesInstanceUID = displaySet.SeriesInstanceUID;
+
+      // Load measurements JSON
+      const { loadMeasurementsJSON } = await import('@ohif/core/src/utils/saveMeasurementsJSON');
+      const savedData = await loadMeasurementsJSON(studyInstanceUID, seriesInstanceUID);
+
+      if (!savedData || !savedData.measurements || savedData.measurements.length === 0) {
+        uiNotificationService?.show({
+          title: 'No Saved Measurements',
+          message: 'No saved measurements found for this study/series',
+          type: 'info',
+          duration: 3000,
+        });
+        return;
+      }
+
+      console.log('📋 Loaded measurement data:', savedData);
+
+      // Recreate annotations from JSON
+      const { recreateAnnotationsFromJSON } = await import('./utils/recreateAnnotationsFromJSON');
+      const recreatedCount = await recreateAnnotationsFromJSON(savedData, servicesManager);
+
+      if (recreatedCount > 0) {
+        uiNotificationService?.show({
+          title: 'Measurements Loaded',
+          message: `Successfully loaded ${recreatedCount} of ${savedData.measurementCount} measurements`,
+          type: 'success',
+          duration: 3000,
+        });
+      } else {
+        uiNotificationService?.show({
+          title: 'Load Failed',
+          message: 'Could not recreate annotations (check console for details)',
+          type: 'error',
+          duration: 3000,
+        });
+      }
+    },
     _handlePreviewAction: action => {
       const { viewport } = _getActiveViewportEnabledElement();
       const previewTools = getPreviewTools({ toolGroupService });
@@ -2710,6 +3013,41 @@ function commandsModule({
     },
     showModelUploadModal: {
       commandFn: actions.showModelUploadModal,
+      storeContexts: [],
+      options: {},
+    },
+    startNavigation: {
+      commandFn: actions.startNavigation,
+      storeContexts: [],
+      options: {},
+    },
+    stopNavigation: {
+      commandFn: actions.stopNavigation,
+      storeContexts: [],
+      options: {},
+    },
+    toggleNavigation: {
+      commandFn: actions.toggleNavigation,
+      storeContexts: [],
+      options: {},
+    },
+    setTrackingCenter: {
+      commandFn: actions.setTrackingCenter,
+      storeContexts: [],
+      options: {},
+    },
+    addFiducialAtCrosshair: {
+      commandFn: actions.addFiducialAtCrosshair,
+      storeContexts: [],
+      options: {},
+    },
+    saveMeasurementsJSON: {
+      commandFn: actions.saveMeasurementsJSON,
+      storeContexts: [],
+      options: {},
+    },
+    loadMeasurementsJSON: {
+      commandFn: actions.loadMeasurementsJSON,
       storeContexts: [],
       options: {},
     },

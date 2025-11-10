@@ -50,9 +50,15 @@ export default function downloadCSVReport(measurementData) {
 
   const results = _mapReportsToRowArray(reportMap, columns);
 
-  let csvContent = 'data:text/csv;charset=utf-8,' + results.map(res => res.join(',')).join('\n');
+  // Generate CSV content (without data URI prefix for saving)
+  const csvRows = results.map(res => res.join(',')).join('\n');
+  let csvContent = 'data:text/csv;charset=utf-8,' + csvRows;
 
+  // Download CSV to browser (existing behavior)
   _createAndDownloadFile(csvContent);
+
+  // Also save to syncforge directory structure
+  _saveCSVToSurgicalCase(csvRows, measurementData);
 }
 
 function _mapReportsToRowArray(reportMap, columns) {
@@ -103,4 +109,62 @@ function _createAndDownloadFile(csvContent) {
   link.setAttribute('download', 'MeasurementReport.csv');
   document.body.appendChild(link);
   link.click();
+}
+
+/**
+ * Save CSV to syncforge directory structure
+ * Calls backend API to save file: syncforge/studies/{StudyInstanceUID}/{SeriesInstanceUID}/measurements-{timestamp}.csv
+ */
+async function _saveCSVToSurgicalCase(csvContent, measurementData) {
+  if (!measurementData || measurementData.length === 0) {
+    return;
+  }
+
+  // Extract StudyInstanceUID and SeriesInstanceUID from first measurement
+  // (assuming all measurements are from same study/series)
+  const firstMeasurement = measurementData[0];
+  const studyInstanceUID = firstMeasurement.referenceStudyUID;
+  const seriesInstanceUID = firstMeasurement.referenceSeriesUID;
+
+  if (!studyInstanceUID || !seriesInstanceUID) {
+    console.warn('⚠️ Cannot save CSV: Missing StudyInstanceUID or SeriesInstanceUID');
+    return;
+  }
+
+  // Generate filename with timestamp
+  const now = new Date();
+  const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19); // YYYY-MM-DDTHH-MM-SS
+  const filename = `measurements-${timestamp}.csv`;
+
+  // Prepare data for backend API
+  const saveData = {
+    studyInstanceUID,
+    seriesInstanceUID,
+    filename,
+    csvContent,
+  };
+
+  try {
+    // Call backend API endpoint (use full URL with port 3001)
+    const response = await fetch('http://localhost:3001/api/syncforge/save-csv', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(saveData),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`✅ Measurement CSV saved to: ${result.filePath}`);
+    } else {
+      const error = await response.text();
+      console.warn(`⚠️ Failed to save CSV to syncforge: ${error}`);
+      // Don't throw - browser download still succeeded
+    }
+  } catch (error) {
+    // Silently fail if backend is not available
+    // Browser download still works
+    console.warn('⚠️ Could not save CSV to syncforge (backend may not be configured):', error.message);
+  }
 }

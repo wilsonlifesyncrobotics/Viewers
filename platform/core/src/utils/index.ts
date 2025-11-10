@@ -28,6 +28,8 @@ import debounce from './debounce';
 import roundNumber from './roundNumber';
 import toNumber from './toNumber';
 import downloadCSVReport from './downloadCSVReport';
+import loadSavedMeasurements from './loadSavedMeasurements';
+import saveMeasurementsJSON from './saveMeasurementsJSON';
 import isEqualWithin from './isEqualWithin';
 import addAccessors from './addAccessors';
 import {
@@ -91,6 +93,8 @@ const utils = {
   roundNumber,
   toNumber,
   downloadCSVReport,
+  loadSavedMeasurements,
+  saveMeasurementsJSON,
   splitComma,
   getSplitParam,
   generateAcceptHeader,
@@ -130,6 +134,8 @@ export {
   roundNumber,
   toNumber,
   downloadCSVReport,
+  loadSavedMeasurements,
+  saveMeasurementsJSON,
   splitComma,
   getSplitParam,
   generateAcceptHeader,

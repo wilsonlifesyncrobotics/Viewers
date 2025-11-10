@@ -21,6 +21,7 @@ export const ohif = {
   layout: '@ohif/extension-default.layoutTemplateModule.viewerLayout',
   sopClassHandler: '@ohif/extension-default.sopClassHandlerModule.stack',
   thumbnailList: '@ohif/extension-default.panelModule.seriesList',
+  trackingPanel: '@ohif/extension-default.panelModule.trackingPanel',
   wsiSopClassHandler:
     '@ohif/extension-cornerstone.sopClassHandlerModule.DicomMicroscopySopClassHandler',
 };
@@ -207,6 +208,8 @@ export const toolbarSections = {
     'WindowLevel',
     'Capture',
     'ModelUpload',
+    'RealTimeNavigation',
+    'SetNavigationCenter',
     'Layout',
     'Crosshairs',
     'MoreTools',
@@ -239,6 +242,9 @@ export const toolbarSections = {
     'EllipticalROI',
     'RectangleROI',
     'CircleROI',
+    'FiducialMarker',
+    'SaveMeasurements',
+    'LoadMeasurements',
     'PlanarFreehandROI',
     'SplineROI',
     'LivewireContour',
@@ -272,8 +278,8 @@ export const basicLayout = {
   props: {
     leftPanels: [ohif.thumbnailList],
     leftPanelResizable: true,
-    rightPanels: [cornerstone.segmentation, cornerstone.measurements],
-    rightPanelClosed: true,
+    rightPanels: [ohif.trackingPanel, cornerstone.segmentation, cornerstone.measurements],
+    rightPanelClosed: false,
     rightPanelResizable: true,
     viewports: [
       {
