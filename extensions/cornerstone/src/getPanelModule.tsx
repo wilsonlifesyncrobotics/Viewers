@@ -4,6 +4,7 @@ import { Toolbox } from '@ohif/extension-default';
 import PanelSegmentation from './panels/PanelSegmentation';
 import ActiveViewportWindowLevel from './components/ActiveViewportWindowLevel';
 import PanelMeasurement from './panels/PanelMeasurement';
+import PanelTracking from './panels/PanelTracking';
 import ViewportStatePanel from './viewportStatePanel';
 
 const getPanelModule = ({ commandsManager, servicesManager, extensionManager }: withAppTypes) => {
@@ -102,6 +103,13 @@ const getPanelModule = ({ commandsManager, servicesManager, extensionManager }: 
           {...props}
         />
       ),
+    },
+    {
+      name: 'panelTracking',
+      iconName: 'tab-linear',
+      iconLabel: 'Tracking',
+      label: 'Tracking Control',
+      component: PanelTracking,
     },
   ];
 };
