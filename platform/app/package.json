@@ -108,6 +108,7 @@
   },
   "devDependencies": {
     "@babel/plugin-transform-private-methods": "^7.27.1",
+    "@kitware/vtk.js": "^30.5.3",
     "@pmmmwh/react-refresh-webpack-plugin": "0.5.17",
     "@types/node": "^20.12.12",
     "clean-webpack-plugin": "4.0.0",
