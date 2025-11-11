@@ -6,6 +6,7 @@ import ActiveViewportWindowLevel from './components/ActiveViewportWindowLevel';
 import PanelMeasurement from './panels/PanelMeasurement';
 import PanelTracking from './panels/PanelTracking';
 import ViewportStatePanel from './viewportStatePanel';
+import ScrewManagementPanel from './ScrewManagementPanel';
 
 const getPanelModule = ({ commandsManager, servicesManager, extensionManager }: withAppTypes) => {
   const wrappedPanelSegmentation = ({ configuration }) => {
@@ -90,7 +91,7 @@ const getPanelModule = ({ commandsManager, servicesManager, extensionManager }: 
       label: 'Segmentation',
       component: wrappedPanelSegmentationWithTools,
     },
-    // ✅ FIXED: Your viewport state panel
+    // Viewport state panel (legacy)
     {
       name: 'viewport-state',
       label: 'Viewport States',
@@ -104,12 +105,27 @@ const getPanelModule = ({ commandsManager, servicesManager, extensionManager }: 
         />
       ),
     },
+    // Tracking control panel (integrated with asset management)
     {
       name: 'panelTracking',
       iconName: 'tab-linear',
       iconLabel: 'Tracking',
       label: 'Tracking Control',
       component: PanelTracking,
+    },
+    // Screw management panel (pedicle screw planning)
+    {
+      name: 'screw-management',
+      label: 'Screw Management',
+      iconName: 'tool-more-menu',
+      component: (props) => (
+        <ScrewManagementPanel
+          servicesManager={servicesManager}
+          commandsManager={commandsManager}
+          extensionManager={extensionManager}
+          {...props}
+        />
+      ),
     },
   ];
 };
