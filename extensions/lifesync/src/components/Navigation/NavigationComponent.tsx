@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { ViewportActionArrows } from '@ohif/ui-next';
 import { useSystem } from '@ohif/core/src';
-import { utils } from '../../utils';
+import utils from '../../utils';
 import { useViewportSegmentations } from '../../hooks/useViewportSegmentations';
 import { useMeasurementTracking } from '../../hooks/useMeasurementTracking';
 import { useViewportDisplaySets } from '../../hooks/useViewportDisplaySets';

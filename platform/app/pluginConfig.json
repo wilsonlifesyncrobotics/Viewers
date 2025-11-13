@@ -8,6 +8,10 @@
       "version": "3.0.0"
     },
     {
+      "packageName": "@ohif/extension-lifesync",
+      "version": "3.12.0-beta.56"
+    },
+    {
       "packageName": "@ohif/extension-measurement-tracking",
       "default": false,
       "version": "3.0.0"
