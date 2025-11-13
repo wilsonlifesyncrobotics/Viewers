@@ -725,11 +725,22 @@ export default function ScrewManagementPanel({ servicesManager }) {
     try {
       if (screws.length === 0) {
         console.warn('⚠️ No screws to export');
+        alert('No screws to export. Please add some screws first.');
         return;
       }
 
-      // Get JSON from service
-      const jsonString = viewportStateService.exportJSON();
+      console.log(`📤 Exporting ${screws.length} screws...`);
+
+      // Export the screws from React state (not from viewportStateService)
+      // This includes all screw data from the API/localStorage
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        sessionId: sessionId,
+        screwCount: screws.length,
+        screws: screws
+      };
+
+      const jsonString = JSON.stringify(exportData, null, 2);
 
       // Create blob and download
       const blob = new Blob([jsonString], { type: 'application/json' });
@@ -746,9 +757,11 @@ export default function ScrewManagementPanel({ servicesManager }) {
       URL.revokeObjectURL(url);
 
       console.log(`✅ Exported ${screws.length} screws to: ${filename}`);
+      console.log('Export data:', exportData);
 
     } catch (error) {
       console.error('Failed to export:', error);
+      alert('Failed to export screws. Check console for details.');
     }
   };
 
