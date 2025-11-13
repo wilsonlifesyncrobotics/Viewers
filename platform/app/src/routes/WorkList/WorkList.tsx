@@ -37,181 +37,7 @@ import {
   Button as ButtonNext,
 } from '@ohif/ui-next';
 
-// Case Creation Dialog
-const CreateCaseDialog = ({ isOpen, onClose, onCreateCase, servicesManager }) => {
-  const [formData, setFormData] = React.useState({
-    caseId: '',
-    patientName: '',
-    patientMRN: '',
-    caseName: '',
-    surgeryDate: '',
-    description: '',
-  });
-  const [isCreating, setIsCreating] = React.useState(false);
-  const [error, setError] = React.useState(null);
-
-  const handleCreate = async () => {
-    if (!formData.caseId || !formData.patientMRN) {
-      setError('Case ID and Patient MRN are required');
-      return;
-    }
-
-    setIsCreating(true);
-    setError(null);
-
-    try {
-      const caseData = {
-        caseId: formData.caseId,
-        caseName: formData.caseName || formData.caseId,
-        patientInfo: {
-          name: formData.patientName,
-          mrn: formData.patientMRN,
-        },
-        surgeryDate: formData.surgeryDate || null,
-        description: formData.description || '',
-        studies: [],
-        primaryReference: null,
-      };
-
-      await onCreateCase(caseData);
-
-      // Reset form
-      setFormData({
-        caseId: '',
-        patientName: '',
-        patientMRN: '',
-        caseName: '',
-        surgeryDate: '',
-        description: '',
-      });
-      onClose();
-    } catch (err) {
-      setError(err.message || 'Failed to create case');
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-secondary-dark border-secondary-light w-full max-w-lg rounded-lg border p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Create New Case</h2>
-          <button
-            onClick={onClose}
-            className="text-primary-light hover:text-white"
-          >
-            <Icons.Close className="h-5 w-5" />
-          </button>
-        </div>
-
-        {error && (
-          <div className="mb-4 rounded bg-red-500 bg-opacity-20 p-3 text-sm text-red-300">
-            {error}
-          </div>
-        )}
-
-        <div className="space-y-4">
-          <div>
-            <label className="text-primary-light mb-1 block text-sm font-medium">
-              Case ID *
-            </label>
-            <input
-              type="text"
-              value={formData.caseId}
-              onChange={(e) => setFormData({ ...formData, caseId: e.target.value })}
-              placeholder="e.g., CASE-2025-001"
-              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-primary-light mb-1 block text-sm font-medium">
-              Patient MRN *
-            </label>
-            <input
-              type="text"
-              value={formData.patientMRN}
-              onChange={(e) => setFormData({ ...formData, patientMRN: e.target.value })}
-              placeholder="Medical Record Number"
-              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-primary-light mb-1 block text-sm font-medium">
-              Patient Name
-            </label>
-            <input
-              type="text"
-              value={formData.patientName}
-              onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
-              placeholder="Patient full name"
-              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-primary-light mb-1 block text-sm font-medium">
-              Case Name
-            </label>
-            <input
-              type="text"
-              value={formData.caseName}
-              onChange={(e) => setFormData({ ...formData, caseName: e.target.value })}
-              placeholder="Optional - defaults to Case ID"
-              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-primary-light mb-1 block text-sm font-medium">
-              Surgery Date
-            </label>
-            <input
-              type="date"
-              value={formData.surgeryDate}
-              onChange={(e) => setFormData({ ...formData, surgeryDate: e.target.value })}
-              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-primary-light mb-1 block text-sm font-medium">
-              Description
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Optional case description"
-              rows={3}
-              className="bg-primary-dark text-primary-light border-primary-light w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-2">
-          <ButtonNext
-            variant="ghost"
-            onClick={onClose}
-            disabled={isCreating}
-          >
-            Cancel
-          </ButtonNext>
-          <ButtonNext
-            onClick={handleCreate}
-            disabled={isCreating}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {isCreating ? 'Creating...' : 'Create Case'}
-          </ButtonNext>
-        </div>
-      </div>
-    </div>
-  );
-};
+import { EditCaseDialog, CreateCaseDialog } from '@ohif/extension-lifesync/src/components/CaseManagement';
 
 // Simplified Case Selector for WorkList
 const WorkListCaseSelector = ({ servicesManager, viewMode, setViewMode, cases, loadingCases }) => {
@@ -245,11 +71,17 @@ const WorkListCaseSelector = ({ servicesManager, viewMode, setViewMode, cases, l
     return () => unsubscribe?.unsubscribe();
   }, [caseService]);
 
-  const handleCreateCase = async (caseData) => {
-    if (!caseService) return;
-    await caseService.createCase(caseData);
+  const handleCreateCase = async (patientInfo) => {
+    if (!caseService) return null;
+
+    // Call caseService.createCase with just patientInfo
+    // API will auto-generate case ID
+    const newCase = await caseService.createCase(patientInfo);
+
     await loadCases(); // Reload cases
-    caseService.setActiveCaseId(caseData.caseId); // Auto-select new case
+    caseService.setActiveCaseId(newCase.caseId); // Auto-select new case
+
+    return newCase; // Return the created case for success message
   };
 
   if (!caseService) {
@@ -514,6 +346,10 @@ function WorkList({
   const [caseStudies, setCaseStudies] = useState(new Map()); // caseId -> studies
   const [loadingCases, setLoadingCases] = useState(false);
 
+  // ~ Edit Case Dialog State
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedCase, setSelectedCase] = useState(null);
+
   // ~ Filters
   const searchParams = useSearchParams();
   const navigate = useNavigate();
@@ -654,6 +490,20 @@ function WorkList({
       setCases([]);
     } finally {
       setLoadingCases(false);
+    }
+  };
+
+  // Update case handler for Edit dialog
+  const handleUpdateCase = async (updates) => {
+    if (!caseService || !selectedCase) return;
+
+    try {
+      await caseService.updateCase(selectedCase.caseId, updates);
+      await loadCases(); // Reload cases list
+      console.log(`✅ Case ${selectedCase.caseId} updated successfully`);
+    } catch (err) {
+      console.error('Failed to update case:', err);
+      throw err; // Let EditCaseDialog show the error
     }
   };
 
@@ -912,35 +762,84 @@ function WorkList({
               gridCol: 3,
             },
             {
-              key: 'addStudy',
+              key: 'actions',
               content: (
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    setAddStudyToCaseId(caseItem.caseId);
-                    setShowAddStudyModal(true);
-                    setLoadingOrthancStudies(true);
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      setAddStudyToCaseId(caseItem.caseId);
+                      setShowAddStudyModal(true);
+                      setLoadingOrthancStudies(true);
 
-                    try {
-                      if (caseService) {
-                        const studies = await caseService.getAllOrthancStudies();
-                        setOrthancStudies(studies);
+                      try {
+                        if (caseService) {
+                          const studies = await caseService.getAllOrthancStudies();
+                          setOrthancStudies(studies);
+                        }
+                      } catch (err) {
+                        console.error('Failed to load Orthanc studies:', err);
+                        alert('Failed to load studies from Orthanc');
+                      } finally {
+                        setLoadingOrthancStudies(false);
                       }
-                    } catch (err) {
-                      console.error('Failed to load Orthanc studies:', err);
-                      alert('Failed to load studies from Orthanc');
-                    } finally {
-                      setLoadingOrthancStudies(false);
-                    }
-                  }}
-                  className="hover:bg-green-900/50 flex items-center gap-1 rounded border border-green-500/30 bg-green-900/20 px-2 py-1 transition-colors"
-                  title="Add Study to Case"
-                >
-                  <Icons.Add className="h-4 w-4 text-green-400" />
-                  <span className="text-xs text-green-300">Add Study</span>
-                </button>
+                    }}
+                    className="hover:bg-green-900/50 flex items-center gap-1 rounded border border-green-500/30 bg-green-900/20 px-2 py-1 transition-colors"
+                    title="Add Study to Case"
+                  >
+                    <Icons.Add className="h-4 w-4 text-green-400" />
+                    <span className="text-xs text-green-300">Add Study</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Transform case data to match EditCaseDialog's expected structure
+                      const caseDataForDialog = {
+                        caseId: caseItem.caseId,
+                        patientInfo: {
+                          mrn: caseItem.mrn || '',
+                          name: caseItem.patientName || '',
+                          dateOfBirth: caseItem.dateOfBirth || ''
+                        },
+                        status: caseItem.status || 'created'
+                      };
+                      setSelectedCase(caseDataForDialog);
+                      setIsEditDialogOpen(true);
+                    }}
+                    className="hover:bg-blue-900/50 flex items-center gap-1 rounded border border-blue-500/30 bg-blue-900/20 px-2 py-1 transition-colors"
+                    title="Edit Case"
+                  >
+                    <Icons.Settings className="h-4 w-4 text-blue-400" />
+                    <span className="text-xs text-blue-300">Edit</span>
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+
+                      if (!confirm(`Delete case "${caseItem.caseId}"?\n\nThis will also delete ${caseItem.studyCount} enrolled study/studies.\n\nThis action cannot be undone.`)) {
+                        return;
+                      }
+
+                      try {
+                        if (caseService) {
+                          await caseService.deleteCase(caseItem.caseId);
+                          await loadCases(); // Reload cases list
+                          console.log(`✅ Case ${caseItem.caseId} deleted`);
+                        }
+                      } catch (err) {
+                        console.error('Failed to delete case:', err);
+                        alert(`Failed to delete case: ${err.message}`);
+                      }
+                    }}
+                    className="hover:bg-red-900/50 flex items-center gap-1 rounded border border-red-500/30 bg-red-900/20 px-2 py-1 transition-colors"
+                    title="Delete Case"
+                  >
+                    <Icons.Cancel className="h-4 w-4 text-red-400" />
+                    <span className="text-xs text-red-300">Delete</span>
+                  </button>
+                </div>
               ),
-              gridCol: 2,
+              gridCol: 4,
             },
             {
               key: 'expandIcon',
@@ -1732,6 +1631,12 @@ function WorkList({
       <ApiConfigPanel servicesManager={servicesManager} />
       <Onboarding />
       <InvestigationalUseDialog dialogConfiguration={appConfig?.investigationalUseDialog} />
+      <EditCaseDialog
+        isOpen={isEditDialogOpen}
+        caseData={selectedCase}
+        onClose={() => setIsEditDialogOpen(false)}
+        onUpdate={handleUpdateCase}
+      />
       <div className="flex h-full flex-col overflow-y-auto">
         <ScrollArea>
           <div className="flex grow flex-col">
