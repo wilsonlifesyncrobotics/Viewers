@@ -375,13 +375,28 @@ export default function ScrewManagementPanel({ servicesManager }) {
 
       // Apply transform if provided
       if (transform && transform.length === 16) {
+        console.log('🔧 Applying transform matrix to model...');
+        console.log(`   Transform type: ${typeof transform}`);
+        console.log(`   Transform length: ${transform.length}`);
+        console.log(`   Transform sample: [${transform.slice(0, 4).map(v => v.toFixed(2)).join(', ')}, ...]`);
+        console.log(`   Translation: (${transform[3].toFixed(2)}, ${transform[7].toFixed(2)}, ${transform[11].toFixed(2)})`);
+        
         // Find the loaded model and apply transform
         const loadedModels = modelStateService.getAllModels();
         const latestModel = loadedModels[loadedModels.length - 1];
 
         if (latestModel) {
+          console.log(`   Target model ID: ${latestModel.metadata.id}`);
           modelStateService.setModelTransform(latestModel.metadata.id, transform);
-          console.log(`🔧 Applied transform to model: ${latestModel.metadata.id}`);
+          console.log(`✅ Transform applied to model: ${latestModel.metadata.id}`);
+        } else {
+          console.error('❌ No model found to apply transform to!');
+        }
+      } else {
+        console.warn(`⚠️ Invalid or missing transform (length: ${transform?.length || 0})`);
+        if (transform) {
+          console.warn(`   Transform type: ${typeof transform}`);
+          console.warn(`   Transform value:`, transform);
         }
       }
 
@@ -729,7 +744,38 @@ export default function ScrewManagementPanel({ servicesManager }) {
       // For API-based screws, we need to load the model manually
       const radius = screwData.radius || screwData.screw_variant_id?.split('-')[1] || 3.5;
       const length = screwData.length || screwData.screw_variant_id?.split('-')[2] || 40;
-      const transform = screwData.transform_matrix || screwData.transform || [];
+      
+      // Get transform - prefer parsed 'transform' over string 'transform_matrix'
+      let transform = screwData.transform || [];
+      
+      // If transform is still a string (from transform_matrix), parse it
+      if (typeof transform === 'string') {
+        try {
+          transform = JSON.parse(transform);
+          console.log('📐 Parsed transform matrix from string');
+        } catch (e) {
+          console.error('❌ Failed to parse transform matrix:', e);
+          transform = [];
+        }
+      }
+      
+      // If we got transform_matrix but no transform, try to parse it
+      if ((!transform || transform.length === 0) && screwData.transform_matrix) {
+        try {
+          transform = typeof screwData.transform_matrix === 'string' 
+            ? JSON.parse(screwData.transform_matrix)
+            : screwData.transform_matrix;
+          console.log('📐 Parsed transform matrix from transform_matrix field');
+        } catch (e) {
+          console.error('❌ Failed to parse transform_matrix:', e);
+          transform = [];
+        }
+      }
+      
+      console.log(`📐 Transform array length: ${transform?.length || 0}`);
+      if (transform && transform.length === 16) {
+        console.log(`📐 Transform values: [${transform.slice(0, 4).join(', ')}, ...]`);
+      }
 
       // Load and display the 3D model
       await loadScrewModel(radius, length, transform);
@@ -781,21 +827,21 @@ export default function ScrewManagementPanel({ servicesManager }) {
           } else {
             console.log('✅ Deleted screw from gRPC service');
           }
-          
+
           // ALSO delete from database directly
           try {
             const dbResponse = await fetch(`http://localhost:3001/api/planning/screws/${screwId}/database`, {
               method: 'DELETE',
               headers: { 'Content-Type': 'application/json' }
             });
-            
+
             if (dbResponse.ok) {
               console.log('✅ Deleted screw from database');
             }
           } catch (dbError) {
             console.warn('⚠️ Database delete failed:', dbError);
           }
-          
+
         } catch (apiError) {
           console.warn('⚠️ API delete failed, continuing with local cleanup:', apiError);
         }
