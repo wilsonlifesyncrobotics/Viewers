@@ -389,7 +389,7 @@ export default function ScrewManagementPanel({ servicesManager }) {
         console.log(`   Transform length: ${transform.length}`);
         console.log(`   Transform sample: [${transform.slice(0, 4).map(v => v.toFixed(2)).join(', ')}, ...]`);
         console.log(`   Translation: (${transform[3].toFixed(2)}, ${transform[7].toFixed(2)}, ${transform[11].toFixed(2)})`);
-        
+
         // Find the loaded model and apply transform
         const loadedModels = modelStateService.getAllModels();
         const latestModel = loadedModels[loadedModels.length - 1];
@@ -750,13 +750,17 @@ export default function ScrewManagementPanel({ servicesManager }) {
       }
 
       console.log(`🔄 Restoring screw: "${screwData.name || screwData.screw_id}" (${existingModels.length + 1}/${maxModels} models)`);
+      console.log(`🔍 Screw data keys:`, Object.keys(screwData));
+      console.log(`🔍 screwData.transform:`, screwData.transform);
+      console.log(`🔍 screwData.transform_matrix:`, screwData.transform_matrix?.substring(0, 100) + '...');
 
       // For API-based screws, we need to load the model manually
       const radius = screwData.radius || screwData.screw_variant_id?.split('-')[1] || 3.5;
       const length = screwData.length || screwData.screw_variant_id?.split('-')[2] || 40;
-
+      
       // Get transform - prefer parsed 'transform' over string 'transform_matrix'
       let transform = screwData.transform || [];
+      console.log(`🔍 Initial transform value:`, transform);
 
       // If transform is still a string (from transform_matrix), parse it
       if (typeof transform === 'string') {
@@ -784,10 +788,14 @@ export default function ScrewManagementPanel({ servicesManager }) {
 
       console.log(`📐 Transform array length: ${transform?.length || 0}`);
       if (transform && transform.length === 16) {
-        console.log(`📐 Transform values: [${transform.slice(0, 4).join(', ')}, ...]`);
+        console.log(`📐 Transform values (first 12): [${transform.slice(0, 12).map(v => v.toFixed(2)).join(', ')}]`);
+        console.log(`📐 Translation from transform: (${transform[3]?.toFixed(2)}, ${transform[7]?.toFixed(2)}, ${transform[11]?.toFixed(2)})`);
+      } else {
+        console.warn(`⚠️ Transform validation failed! Length: ${transform?.length}, Type: ${typeof transform}, IsArray: ${Array.isArray(transform)}`);
       }
 
       // Load and display the 3D model
+      console.log(`🚀 Calling loadScrewModel with transform length: ${transform?.length}`);
       await loadScrewModel(radius, length, transform);
 
       // Restore viewport states if available
