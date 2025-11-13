@@ -10,7 +10,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { getRenderingEngine } from '@cornerstonejs/core';
-import { crosshairsHandler } from './utils/crosshairsHandler';
+import { crosshairsHandler } from '../../utils/crosshairsHandler';
 
 export default function ScrewManagementPanel({ servicesManager }) {
   const { viewportStateService, modelStateService, planeCutterService } = servicesManager.services;
