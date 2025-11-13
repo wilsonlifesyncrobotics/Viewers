@@ -583,19 +583,20 @@ export default function ScrewManagementPanel({ servicesManager }) {
       // Get transform - API now returns it already parsed as array
       // ═══════════════════════════════════════════════════════════
       let transformArray = screwData.transform_matrix;
-      
+
       console.log(`🔍 transform_matrix type: ${typeof transformArray}`);
       console.log(`🔍 transform_matrix is array: ${Array.isArray(transformArray)}`);
       console.log(`🔍 transform_matrix length: ${transformArray?.length}`);
-      
+
       // Validate it's a proper array with 16 elements
       if (!transformArray || !Array.isArray(transformArray) || transformArray.length !== 16) {
         console.error(`❌ Invalid transform_matrix! Type: ${typeof transformArray}, Length: ${transformArray?.length}`);
         console.warn(`⚠️ Loading screw without transform - will appear at origin`);
         transformArray = null;
       } else {
-        // Keep as regular number[] array (modelStateService expects number[], not Float32Array)
-        console.log(`✅ Valid transform array`);
+        // Convert to Float32Array for VTK
+        transformArray = new Float32Array(transformArray);
+        console.log(`✅ Valid transform array converted to Float32Array`);
         console.log(`📐 Translation: (${transformArray[3].toFixed(2)}, ${transformArray[7].toFixed(2)}, ${transformArray[11].toFixed(2)})`);
       }
 
@@ -605,14 +606,23 @@ export default function ScrewManagementPanel({ servicesManager }) {
       // Restore viewport states if available
       if (screwData.viewport_states_json || screwData.viewportStates) {
         try {
-          const viewportStates = screwData.viewport_states_json ?
-            JSON.parse(screwData.viewport_states_json) :
-            screwData.viewportStates;
+          // API now returns viewport_states_json already parsed as object
+          // Check if it's already an object or still a string
+          let viewportStates = screwData.viewport_states_json || screwData.viewportStates;
+          
+          if (typeof viewportStates === 'string') {
+            console.log('🔄 Parsing viewport_states_json from string');
+            viewportStates = JSON.parse(viewportStates);
+          }
+          
+          console.log('📊 Viewport states type:', typeof viewportStates);
+          console.log('📊 Viewport IDs:', Object.keys(viewportStates || {}));
 
           viewportStateService.restoreViewportStates(viewportStates);
           console.log('✅ Viewport states restored');
         } catch (stateError) {
           console.warn('⚠️ Could not restore viewport states:', stateError);
+          console.error('   Error details:', stateError);
         }
       }
 
