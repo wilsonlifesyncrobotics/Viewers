@@ -28,6 +28,158 @@ export default function ScrewManagementPanel({ servicesManager }) {
   }, []);
 
   /**
+   * Get actual DICOM UIDs from the active viewport
+   */
+  const getDicomUIDs = () => {
+    try {
+      // Get rendering engine and viewports
+      const renderingEngine = getRenderingEngine('OHIFCornerstoneRenderingEngine');
+      if (!renderingEngine) {
+        console.warn('⚠️ Rendering engine not found');
+        return null;
+      }
+
+      // Try to get any viewport
+      const viewportIds = renderingEngine.getViewportIds();
+      if (!viewportIds || viewportIds.length === 0) {
+        console.warn('⚠️ No viewports available');
+        return null;
+      }
+
+      // Get the first viewport's DICOM data
+      const viewport = renderingEngine.getViewport(viewportIds[0]);
+      if (!viewport) {
+        console.warn('⚠️ Viewport not found');
+        return null;
+      }
+
+      // Try to get image data from the viewport
+      const imageData = viewport.getImageData?.();
+      if (!imageData) {
+        console.warn('⚠️ No image data in viewport');
+        return null;
+      }
+
+      // Get metadata from the image
+      const metadata = imageData.metadata || {};
+      const studyInstanceUID = metadata.StudyInstanceUID || metadata.studyInstanceUID;
+      const seriesInstanceUID = metadata.SeriesInstanceUID || metadata.seriesInstanceUID;
+
+      if (!studyInstanceUID || !seriesInstanceUID) {
+        console.warn('⚠️ Could not extract DICOM UIDs from viewport');
+        return null;
+      }
+
+      return { studyInstanceUID, seriesInstanceUID };
+    } catch (error) {
+      console.error('❌ Error getting DICOM UIDs:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Check for existing plans for a series
+   */
+  const checkExistingPlans = async (seriesInstanceUID) => {
+    try {
+      const response = await fetch(
+        `http://localhost:3001/api/planning/plan/by-series/${encodeURIComponent(seriesInstanceUID)}`
+      );
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const data = await response.json();
+      return data.success ? data.plans : [];
+    } catch (error) {
+      console.error('❌ Error checking existing plans:', error);
+      return [];
+    }
+  };
+
+  /**
+   * Load an existing plan
+   */
+  const loadExistingPlan = async (planId) => {
+    try {
+      console.log(`📂 Loading existing plan: ${planId}`);
+
+      const response = await fetch(`http://localhost:3001/api/planning/plan/${planId}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to load plan: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('📡 Plan API response:', data);
+
+      if (!data.success || !data.plan) {
+        throw new Error('Plan data not available');
+      }
+
+      const plan = data.plan;
+      console.log(`📋 Plan details: "${plan.name}", session=${plan.session_id}, screws=${plan.screws?.length || 0}`);
+
+      // Set the session ID from the plan
+      setSessionId(plan.session_id);
+      setSessionStatus('ready');
+
+      // Load screws from the plan
+      if (plan.screws && plan.screws.length > 0) {
+        console.log(`✅ Loading ${plan.screws.length} screws from plan`);
+
+        // Convert plan screws to the format expected by the UI
+        const screwsData = plan.screws.map((screw, index) => ({
+          screw_id: screw.screw_id || `screw-${index + 1}`, // Use screw_id to match UI expectations
+          name: screw.name || `Screw ${index + 1}`,
+          radius: screw.radius || 3.5,
+          length: screw.length || 40,
+          transform_matrix: screw.transform_matrix, // Keep original field name
+          transform: screw.transform_matrix ? JSON.parse(screw.transform_matrix) : null,
+          viewportStates: screw.viewport_states_json ? JSON.parse(screw.viewport_states_json) : null,
+          viewport_states_json: screw.viewport_states_json, // Keep original field
+          timestamp: screw.placed_at || new Date().toISOString(),
+          placed_at: screw.placed_at,
+          created_at: screw.created_at
+        }));
+
+        console.log('🔍 Screws data being set:', screwsData);
+        setScrews(screwsData);
+        console.log(`✅ UI state updated with ${screwsData.length} screws`);
+
+        // Restore each screw's 3D model (do this after setting state so UI updates immediately)
+        let restoredCount = 0;
+        for (const screwData of screwsData) {
+          if (screwData.transform && screwData.radius && screwData.length) {
+            try {
+              await restoreScrew(screwData);
+              restoredCount++;
+              console.log(`✅ Restored screw ${restoredCount}/${screwsData.length}: ${screwData.name}`);
+            } catch (error) {
+              console.error(`❌ Failed to restore screw: ${screwData.name}`, error);
+              // Continue with next screw even if this one fails
+            }
+          } else {
+            console.warn(`⚠️ Skipping screw without transform/dimensions: ${screwData.name || screwData.screw_id}`);
+          }
+        }
+
+        console.log(`✅ Loaded plan "${plan.name}": ${screwsData.length} screws in list, ${restoredCount} 3D models restored`);
+      } else {
+        console.log('ℹ️ Plan has no screws');
+        setScrews([]); // Explicitly set empty array to ensure UI updates
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ Error loading plan:', error);
+      console.error('Error details:', error.message, error.stack);
+      return false;
+    }
+  };
+
+  /**
    * Initialize planning session and load existing screws
    */
   const initializeSession = async () => {
@@ -35,15 +187,62 @@ export default function ScrewManagementPanel({ servicesManager }) {
       setIsLoading(true);
       setSessionStatus('initializing');
 
-      // Get case information (would come from case manager service)
-      const caseId = 'OHIF-CASE-' + Date.now(); // TODO: Get from actual case service
-      const studyInstanceUID = '1.2.3.4.5'; // TODO: Get from actual DICOM data
-      const seriesInstanceUID = '1.2.3.4.5.6'; // TODO: Get from actual DICOM data
-      const surgeon = 'OHIF User'; // TODO: Get from user service
+      // Get actual DICOM UIDs from viewport
+      const dicomUIDs = getDicomUIDs();
 
-      console.log('🔄 Initializing planning session...');
-      console.log(`   API: http://localhost:3001/api/planning/session/start`);
-      console.log(`   Case ID: ${caseId}`);
+      let studyInstanceUID, seriesInstanceUID;
+
+      if (dicomUIDs) {
+        studyInstanceUID = dicomUIDs.studyInstanceUID;
+        seriesInstanceUID = dicomUIDs.seriesInstanceUID;
+        console.log('✅ Got DICOM UIDs from viewport:');
+        console.log(`   Study UID: ${studyInstanceUID}`);
+        console.log(`   Series UID: ${seriesInstanceUID}`);
+      } else {
+        // Fallback to dummy values if we can't get real UIDs
+        studyInstanceUID = '1.2.3.4.5';
+        seriesInstanceUID = '1.2.3.4.5.6';
+        console.warn('⚠️ Using fallback DICOM UIDs');
+      }
+
+      // Check for existing plans for this series
+      console.log('🔍 Checking for existing plans...');
+      const existingPlans = await checkExistingPlans(seriesInstanceUID);
+
+      if (existingPlans && existingPlans.length > 0) {
+        console.log(`✅ Found ${existingPlans.length} existing plan(s) for this series`);
+
+        // Load the most recent plan automatically
+        const mostRecentPlan = existingPlans[0];
+        console.log(`📂 Auto-loading most recent plan: ${mostRecentPlan.name}`);
+
+        const loaded = await loadExistingPlan(mostRecentPlan.plan_id);
+
+        if (loaded) {
+          console.log('✅ Successfully loaded existing plan - initialization complete');
+          // Don't return here - let the finally block run to clear isLoading
+          // Just skip creating a new session
+        } else {
+          console.warn('⚠️ Failed to load existing plan, creating new session');
+          // Continue to create new session below
+        }
+      } else {
+        console.log('ℹ️ No existing plans found for this series, creating new session');
+      }
+
+      // Only create a new session if we didn't successfully load an existing plan
+      if (existingPlans && existingPlans.length > 0 && sessionId) {
+        // We successfully loaded a plan, skip session creation
+        console.log('ℹ️ Skipping new session creation - plan already loaded');
+      } else {
+
+      // No existing plans or failed to load - create new session
+      const caseId = null; // Use null for atomic planning (will be assigned to dummy case)
+      const surgeon = 'OHIF User';
+
+      console.log('🔄 Creating new planning session...');
+      console.log(`   Study UID: ${studyInstanceUID}`);
+      console.log(`   Series UID: ${seriesInstanceUID}`);
 
       // Start planning session
       const response = await fetch('http://localhost:3001/api/planning/session/start', {
@@ -67,13 +266,11 @@ export default function ScrewManagementPanel({ servicesManager }) {
       if (data.success && data.session_id) {
         setSessionId(data.session_id);
         setSessionStatus('ready');
-        console.log('✅ Planning session started:', data.session_id);
-
-        // Load existing screws for this session
-        await loadScrews(data.session_id);
+        console.log('✅ New planning session started:', data.session_id);
       } else {
         throw new Error(data.error || 'Session creation failed');
       }
+      } // End of session creation else block
     } catch (error) {
       console.error('❌ Error initializing session:', error);
       setSessionStatus('error');
@@ -137,6 +334,7 @@ export default function ScrewManagementPanel({ servicesManager }) {
   const loadScrewModel = async (radius, length, transform) => {
     try {
       console.log(`🔍 Querying model for radius=${radius}, length=${length}`);
+      console.log(`🔍 Transform provided: ${transform ? 'YES' : 'NO'} (length: ${transform?.length || 0})`);
 
       // Query model from planning API
       const queryResponse = await fetch(
@@ -151,6 +349,7 @@ export default function ScrewManagementPanel({ servicesManager }) {
 
       const modelInfo = queryData.model;
       console.log(`📦 Model found: ${modelInfo.model_id} (${modelInfo.source})`);
+      console.log(`🔧 About to load model with transform: ${transform ? 'YES' : 'NO'}`);
 
       // Ensure plane cutters are initialized and enabled
       if (planeCutterService) {
@@ -170,21 +369,44 @@ export default function ScrewManagementPanel({ servicesManager }) {
       const modelUrl = `http://localhost:3001/api/planning/models/${modelInfo.model_id}/obj`;
 
       // Load model using modelStateService
+      console.log(`🔧 Loading model to viewport: ${getCurrentViewportId()}`);
       await modelStateService.loadModelFromServer(modelUrl, {
         viewportId: getCurrentViewportId(),
         color: [1.0, 0.84, 0.0],  // Gold color for screws
         opacity: 0.9
       });
 
+      console.log(`🔧 Model loaded, checking transform condition...`);
+      console.log(`🔧 Transform exists: ${!!transform}`);
+      console.log(`🔧 Transform length: ${transform?.length}`);
+      console.log(`🔧 Transform is array: ${Array.isArray(transform)}`);
+
       // Apply transform if provided
       if (transform && transform.length === 16) {
+        console.log('🔧 Applying transform matrix to model...');
+        console.log(`   Screw dimensions: radius=${radius}mm, length=${length}mm`);
+        console.log(`   Transform type: ${typeof transform}`);
+        console.log(`   Transform length: ${transform.length}`);
+        console.log(`   Transform sample: [${transform.slice(0, 4).map(v => v.toFixed(2)).join(', ')}, ...]`);
+        console.log(`   Translation: (${transform[3].toFixed(2)}, ${transform[7].toFixed(2)}, ${transform[11].toFixed(2)})`);
+
         // Find the loaded model and apply transform
         const loadedModels = modelStateService.getAllModels();
         const latestModel = loadedModels[loadedModels.length - 1];
 
         if (latestModel) {
-          modelStateService.setModelTransform(latestModel.metadata.id, transform);
-          console.log(`🔧 Applied transform to model: ${latestModel.metadata.id}`);
+          console.log(`   Target model ID: ${latestModel.metadata.id}`);
+          // CRITICAL: Pass length as 3rd parameter for proper offset calculation
+          await modelStateService.setModelTransform(latestModel.metadata.id, transform, length);
+          console.log(`✅ Transform applied to model: ${latestModel.metadata.id}`);
+        } else {
+          console.error('❌ No model found to apply transform to!');
+        }
+      } else {
+        console.warn(`⚠️ Invalid or missing transform (length: ${transform?.length || 0})`);
+        if (transform) {
+          console.warn(`   Transform type: ${typeof transform}`);
+          console.warn(`   Transform value:`, transform);
         }
       }
 
@@ -528,13 +750,52 @@ export default function ScrewManagementPanel({ servicesManager }) {
       }
 
       console.log(`🔄 Restoring screw: "${screwData.name || screwData.screw_id}" (${existingModels.length + 1}/${maxModels} models)`);
+      console.log(`🔍 Screw data keys:`, Object.keys(screwData));
+      console.log(`🔍 screwData.transform:`, screwData.transform);
+      console.log(`🔍 screwData.transform_matrix:`, screwData.transform_matrix?.substring(0, 100) + '...');
 
       // For API-based screws, we need to load the model manually
       const radius = screwData.radius || screwData.screw_variant_id?.split('-')[1] || 3.5;
       const length = screwData.length || screwData.screw_variant_id?.split('-')[2] || 40;
-      const transform = screwData.transform_matrix || screwData.transform || [];
+
+      // Get transform - prefer parsed 'transform' over string 'transform_matrix'
+      let transform = screwData.transform || [];
+      console.log(`🔍 Initial transform value:`, transform);
+
+      // If transform is still a string (from transform_matrix), parse it
+      if (typeof transform === 'string') {
+        try {
+          transform = JSON.parse(transform);
+          console.log('📐 Parsed transform matrix from string');
+        } catch (e) {
+          console.error('❌ Failed to parse transform matrix:', e);
+          transform = [];
+        }
+      }
+
+      // If we got transform_matrix but no transform, try to parse it
+      if ((!transform || transform.length === 0) && screwData.transform_matrix) {
+        try {
+          transform = typeof screwData.transform_matrix === 'string'
+            ? JSON.parse(screwData.transform_matrix)
+            : screwData.transform_matrix;
+          console.log('📐 Parsed transform matrix from transform_matrix field');
+        } catch (e) {
+          console.error('❌ Failed to parse transform_matrix:', e);
+          transform = [];
+        }
+      }
+
+      console.log(`📐 Transform array length: ${transform?.length || 0}`);
+      if (transform && transform.length === 16) {
+        console.log(`📐 Transform values (first 12): [${transform.slice(0, 12).map(v => v.toFixed(2)).join(', ')}]`);
+        console.log(`📐 Translation from transform: (${transform[3]?.toFixed(2)}, ${transform[7]?.toFixed(2)}, ${transform[11]?.toFixed(2)})`);
+      } else {
+        console.warn(`⚠️ Transform validation failed! Length: ${transform?.length}, Type: ${typeof transform}, IsArray: ${Array.isArray(transform)}`);
+      }
 
       // Load and display the 3D model
+      console.log(`🚀 Calling loadScrewModel with transform length: ${transform?.length}`);
       await loadScrewModel(radius, length, transform);
 
       // Restore viewport states if available
@@ -568,22 +829,37 @@ export default function ScrewManagementPanel({ servicesManager }) {
 
       console.log(`🗑️ Deleting screw: "${screwName}" (${screwId})`);
 
-      // Try to delete from API first
+      // Try to delete from API first (both from gRPC session AND database)
       if (sessionId && screwId) {
         try {
-          const response = await fetch(`http://localhost:3001/api/planning/screws/${screwId}`, {
+          // Delete from gRPC service (query param)
+          const response = await fetch(`http://localhost:3001/api/planning/screws/${screwId}?sessionId=${sessionId}`, {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId })
+            headers: { 'Content-Type': 'application/json' }
           });
 
           const data = await response.json();
 
           if (!data.success) {
-            console.warn('⚠️ API delete failed, continuing with local cleanup:', data.error);
+            console.warn('⚠️ gRPC delete failed:', data.error);
           } else {
-            console.log('✅ Deleted screw from API');
+            console.log('✅ Deleted screw from gRPC service');
           }
+
+          // ALSO delete from database directly
+          try {
+            const dbResponse = await fetch(`http://localhost:3001/api/planning/screws/${screwId}/database`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (dbResponse.ok) {
+              console.log('✅ Deleted screw from database');
+            }
+          } catch (dbError) {
+            console.warn('⚠️ Database delete failed:', dbError);
+          }
+
         } catch (apiError) {
           console.warn('⚠️ API delete failed, continuing with local cleanup:', apiError);
         }
@@ -622,12 +898,16 @@ export default function ScrewManagementPanel({ servicesManager }) {
 
       console.log(`✅ Removed ${modelsRemoved} model(s)`);
 
-      // Reload screws from API
-      if (sessionId) {
-        await loadScrews(sessionId);
-      } else {
-        loadScrewsLocal();
-      }
+      // Update UI state by filtering out the deleted screw
+      // Don't rely on API reload since screws might not be in gRPC session
+      setScrews(prevScrews => {
+        const filtered = prevScrews.filter(s => {
+          const id = s.screw_id || s.id || s.name;
+          return id !== screwId;
+        });
+        console.log(`📋 Updated screw list: ${filtered.length} screws remaining`);
+        return filtered;
+      });
 
       console.log(`✅ Deleted screw: "${screwName}"`);
 

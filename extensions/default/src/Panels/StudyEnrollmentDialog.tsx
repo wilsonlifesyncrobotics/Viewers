@@ -110,18 +110,17 @@ function StudyEnrollmentDialog({
   const handleCreateAndEnroll = async () => {
     if (!caseService) return;
 
-    if (!newCaseMrn.trim()) {
-      setError('Patient MRN is required');
-      return;
-    }
-
+    // MRN is now optional - auto-generate if not provided
     setIsEnrolling(true);
     setError('');
 
     try {
+      // Auto-generate MRN if not provided: LSR-{timestamp}
+      const mrn = newCaseMrn.trim() || `LSR-${Date.now()}`;
+
       // Create new case
       const newCase = await caseService.createCase({
-        mrn: newCaseMrn.trim(),
+        mrn: mrn,
         name: newCaseName.trim() || undefined,
       });
 
@@ -170,15 +169,21 @@ function StudyEnrollmentDialog({
           </div>
         )}
 
+        <div className="mb-4 rounded bg-blue-500 bg-opacity-20 border border-blue-500/30 p-3 text-sm text-blue-300">
+          <div className="font-medium mb-1">✨ Auto-Generation:</div>
+          <div className="text-xs">• Case ID: Snowflake ID (numeric)</div>
+          <div className="text-xs">• MRN: LSR-{'{'}timestamp{'}'} (if not provided)</div>
+        </div>
+
         <div className="flex flex-col gap-2">
           <label className="text-primary-light text-sm font-medium">
-            Patient MRN <span className="text-red-500">*</span>
+            Patient MRN <span className="text-xs text-gray-400">(Auto-generated if empty)</span>
           </label>
           <input
             type="text"
             value={newCaseMrn}
             onChange={e => setNewCaseMrn(e.target.value)}
-            placeholder="Enter patient MRN"
+            placeholder="Leave empty for LSR-{timestamp}"
             className="bg-primary-dark border-primary-light text-primary-active rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={isEnrolling}
             autoFocus
@@ -227,7 +232,7 @@ function StudyEnrollmentDialog({
           <Button
             variant="primary"
             onClick={handleCreateAndEnroll}
-            disabled={isEnrolling || !newCaseMrn.trim()}
+            disabled={isEnrolling}
           >
             {isEnrolling ? 'Creating...' : 'Create & Enroll'}
           </Button>

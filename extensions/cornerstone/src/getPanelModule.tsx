@@ -8,7 +8,7 @@ import { SegmentationRepresentations } from '@cornerstonejs/tools/enums';
 import i18n from '@ohif/i18n';
 import PanelTracking from './panels/PanelTracking';
 import ViewportStatePanel from './viewportStatePanel';
-import ScrewManagementPanel from './ScrewManagementPanel';
+// NOTE: ScrewManagementPanel moved to @ohif/extension-lifesync
 
 const getPanelModule = ({ commandsManager, servicesManager, extensionManager }: withAppTypes) => {
   const { toolbarService } = servicesManager.services;
@@ -142,20 +142,7 @@ const getPanelModule = ({ commandsManager, servicesManager, extensionManager }: 
       label: 'Tracking Control',
       component: PanelTracking,
     },
-    // Screw management panel (pedicle screw planning)
-    {
-      name: 'screw-management',
-      label: 'Screw Management',
-      iconName: 'tool-more-menu',
-      component: (props) => (
-        <ScrewManagementPanel
-          servicesManager={servicesManager}
-          commandsManager={commandsManager}
-          extensionManager={extensionManager}
-          {...props}
-        />
-      ),
-    },
+    // NOTE: Screw management panel moved to @ohif/extension-lifesync
     // Viewport state panel (legacy)
     {
       name: 'viewport-state',
@@ -178,20 +165,7 @@ const getPanelModule = ({ commandsManager, servicesManager, extensionManager }: 
       label: 'Tracking Control',
       component: PanelTracking,
     },
-    // Screw management panel (pedicle screw planning)
-    {
-      name: 'screw-management',
-      label: 'Screw Management',
-      iconName: 'tool-more-menu',
-      component: (props) => (
-        <ScrewManagementPanel
-          servicesManager={servicesManager}
-          commandsManager={commandsManager}
-          extensionManager={extensionManager}
-          {...props}
-        />
-      ),
-    },
+    // NOTE: Screw management panel moved to @ohif/extension-lifesync
   ];
 };
 

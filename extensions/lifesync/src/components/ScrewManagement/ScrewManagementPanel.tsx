@@ -5,23 +5,30 @@
  * - Save screw placements with radius, length, and transform data
  * - Restore screw placements (loads both viewport state and 3D model)
  * - Delete screws (removes both snapshot and 3D model)
- * - Import/Export screw data as JSON
+ * - Save/Load surgical plans to/from database
  */
 
 import React, { useState, useEffect } from 'react';
 import { getRenderingEngine } from '@cornerstonejs/core';
 import { crosshairsHandler } from '../../utils/crosshairsHandler';
+import PlanSelectionDialog from './PlanSelectionDialog';
 
 export default function ScrewManagementPanel({ servicesManager }) {
   const { viewportStateService, modelStateService, planeCutterService } = servicesManager.services;
   const [screws, setScrews] = useState([]);
   const [sessionId, setSessionId] = useState(null);
+  const [caseId, setCaseId] = useState(null);
+  const [studyInstanceUID, setStudyInstanceUID] = useState(null);
+  const [seriesInstanceUID, setSeriesInstanceUID] = useState(null);
+  const [surgeon, setSurgeon] = useState('OHIF User');
   const [screwName, setScrewName] = useState('');
   const [radius, setRadius] = useState('');
   const [length, setLength] = useState('');
   const [isRestoring, setIsRestoring] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sessionStatus, setSessionStatus] = useState('initializing'); // 'initializing', 'ready', 'error'
+  const [showPlanDialog, setShowPlanDialog] = useState(false);
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
 
   useEffect(() => {
     initializeSession();
@@ -36,24 +43,31 @@ export default function ScrewManagementPanel({ servicesManager }) {
       setSessionStatus('initializing');
 
       // Get case information (would come from case manager service)
-      const caseId = 'OHIF-CASE-' + Date.now(); // TODO: Get from actual case service
-      const studyInstanceUID = '1.2.3.4.5'; // TODO: Get from actual DICOM data
-      const seriesInstanceUID = '1.2.3.4.5.6'; // TODO: Get from actual DICOM data
-      const surgeon = 'OHIF User'; // TODO: Get from user service
+      // For now, use null caseId to allow sessions without cases
+      const newCaseId = null; // TODO: Get from actual case service when available
+      const newStudyUID = '1.2.3.4.5'; // TODO: Get from actual DICOM data
+      const newSeriesUID = '1.2.3.4.5.6'; // TODO: Get from actual DICOM data
+      const newSurgeon = 'OHIF User'; // TODO: Get from user service
+
+      // Store in state for later use in save/load
+      setCaseId(newCaseId);
+      setStudyInstanceUID(newStudyUID);
+      setSeriesInstanceUID(newSeriesUID);
+      setSurgeon(newSurgeon);
 
       console.log('🔄 Initializing planning session...');
       console.log(`   API: http://localhost:3001/api/planning/session/start`);
-      console.log(`   Case ID: ${caseId}`);
+      console.log(`   Case ID: ${newCaseId || 'none (session without case)'}`);
 
-      // Start planning session
+      // Start planning session (caseId is now optional)
       const response = await fetch('http://localhost:3001/api/planning/session/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          caseId,
-          studyInstanceUID,
-          seriesInstanceUID,
-          surgeon
+          studyInstanceUID: newStudyUID,
+          seriesInstanceUID: newSeriesUID,
+          surgeon: newSurgeon
+          // caseId is optional and omitted when null
         })
       });
 
@@ -137,7 +151,8 @@ export default function ScrewManagementPanel({ servicesManager }) {
   const loadScrewModel = async (radius, length, transform) => {
     try {
       console.log(`🔍 Querying model for radius=${radius}, length=${length}`);
-
+      console.log(`🔍 transform:`, transform);
+      console.log(`🔍 transform.length:`, transform.length);
       // Query model from planning API
       const queryResponse = await fetch(
         `http://localhost:3001/api/planning/models/query?radius=${radius}&length=${length}`
@@ -178,14 +193,27 @@ export default function ScrewManagementPanel({ servicesManager }) {
 
       // Apply transform if provided
       if (transform && transform.length === 16) {
+        console.log('🔧 Applying transform to loaded model...');
+        console.log(`   Transform type: ${transform.constructor.name}`);
+        console.log(`   Translation: (${transform[3].toFixed(2)}, ${transform[7].toFixed(2)}, ${transform[11].toFixed(2)})`);
+
         // Find the loaded model and apply transform
         const loadedModels = modelStateService.getAllModels();
         const latestModel = loadedModels[loadedModels.length - 1];
 
         if (latestModel) {
-          modelStateService.setModelTransform(latestModel.metadata.id, transform);
-          console.log(`🔧 Applied transform to model: ${latestModel.metadata.id}`);
+          // CRITICAL: Pass length as 3rd parameter for proper offset
+          await modelStateService.setModelTransform(
+            latestModel.metadata.id,
+            transform,
+            length
+          );
+          console.log(`✅ Applied transform to model: ${latestModel.metadata.id} with length offset: ${length}mm`);
+        } else {
+          console.error('❌ No model found to apply transform to!');
         }
+      } else {
+        console.warn(`⚠️ No valid transform to apply (length: ${transform?.length || 0})`);
       }
 
     } catch (error) {
@@ -420,6 +448,24 @@ export default function ScrewManagementPanel({ servicesManager }) {
       // Get current viewport states for UI restoration
       const viewportStates = viewportStateService.getCurrentViewportStates();
 
+      // Extract position and direction from transform matrix
+      const entryPoint = transform ? {
+        x: transform[3],  // Translation X (index 3)
+        y: transform[7],  // Translation Y (index 7)
+        z: transform[11]  // Translation Z (index 11)
+      } : { x: 0, y: 0, z: 0 };
+
+      // Extract direction from Y-axis of transform (column 1, indices 4, 5, 6)
+      // This represents the screw's long axis
+      const direction = transform ? [
+        transform[4],  // Y-axis X component
+        transform[5],  // Y-axis Y component
+        transform[6]   // Y-axis Z component
+      ] : [0, 1, 0];
+
+      console.log('📍 Extracted screw position:', entryPoint);
+      console.log('🎯 Extracted screw direction:', direction);
+
       try {
         const response = await fetch('http://localhost:3001/api/planning/screws/add-with-transform', {
           method: 'POST',
@@ -434,9 +480,9 @@ export default function ScrewManagementPanel({ servicesManager }) {
               screwVariantId: `generated-${finalRadiusValue}-${finalLengthValue}`,
               vertebralLevel: 'unknown',  // Could be auto-detected later
               side: 'unknown',           // Could be auto-detected later
-              entryPoint: { x: 0, y: 0, z: 0 },  // From transform if available
+              entryPoint: entryPoint,    // Now extracted from crosshair position
               trajectory: {
-                direction: [0, 1, 0],    // From transform if available
+                direction: direction,    // Now extracted from transform matrix
                 insertionDepth: finalLengthValue,
                 convergenceAngle: 0,
                 cephaladAngle: 0
@@ -532,22 +578,51 @@ export default function ScrewManagementPanel({ servicesManager }) {
       // For API-based screws, we need to load the model manually
       const radius = screwData.radius || screwData.screw_variant_id?.split('-')[1] || 3.5;
       const length = screwData.length || screwData.screw_variant_id?.split('-')[2] || 40;
-      const transform = screwData.transform_matrix || screwData.transform || [];
+
+      // ═══════════════════════════════════════════════════════════
+      // Get transform - API now returns it already parsed as array
+      // ═══════════════════════════════════════════════════════════
+      let transformArray = screwData.transform_matrix;
+
+      console.log(`🔍 transform_matrix type: ${typeof transformArray}`);
+      console.log(`🔍 transform_matrix is array: ${Array.isArray(transformArray)}`);
+      console.log(`🔍 transform_matrix length: ${transformArray?.length}`);
+
+      // Validate it's a proper array with 16 elements
+      if (!transformArray || !Array.isArray(transformArray) || transformArray.length !== 16) {
+        console.error(`❌ Invalid transform_matrix! Type: ${typeof transformArray}, Length: ${transformArray?.length}`);
+        console.warn(`⚠️ Loading screw without transform - will appear at origin`);
+        transformArray = null;
+      } else {
+        // Convert to Float32Array for VTK
+        transformArray = new Float32Array(transformArray);
+        console.log(`✅ Valid transform array converted to Float32Array`);
+        console.log(`📐 Translation: (${transformArray[3].toFixed(2)}, ${transformArray[7].toFixed(2)}, ${transformArray[11].toFixed(2)})`);
+      }
 
       // Load and display the 3D model
-      await loadScrewModel(radius, length, transform);
+      await loadScrewModel(radius, length, transformArray);
 
       // Restore viewport states if available
       if (screwData.viewport_states_json || screwData.viewportStates) {
         try {
-          const viewportStates = screwData.viewport_states_json ?
-            JSON.parse(screwData.viewport_states_json) :
-            screwData.viewportStates;
+          // API now returns viewport_states_json already parsed as object
+          // Check if it's already an object or still a string
+          let viewportStates = screwData.viewport_states_json || screwData.viewportStates;
+
+          if (typeof viewportStates === 'string') {
+            console.log('🔄 Parsing viewport_states_json from string');
+            viewportStates = JSON.parse(viewportStates);
+          }
+
+          console.log('📊 Viewport states type:', typeof viewportStates);
+          console.log('📊 Viewport IDs:', Object.keys(viewportStates || {}));
 
           viewportStateService.restoreViewportStates(viewportStates);
           console.log('✅ Viewport states restored');
         } catch (stateError) {
           console.warn('⚠️ Could not restore viewport states:', stateError);
+          console.error('   Error details:', stateError);
         }
       }
 
@@ -721,6 +796,149 @@ export default function ScrewManagementPanel({ servicesManager }) {
     }
   };
 
+  /**
+   * Save current planning session as a plan
+   */
+  const savePlan = async () => {
+    if (!sessionId || !studyInstanceUID || !seriesInstanceUID) {
+      alert('Cannot save plan: Missing session or DICOM information');
+      return;
+    }
+
+    if (screws.length === 0) {
+      alert('Cannot save plan: No screws placed yet');
+      return;
+    }
+
+    try {
+      setIsSavingPlan(true);
+
+      // Prompt for plan name
+      const planName = prompt('Enter a name for this plan:', `Plan ${new Date().toLocaleString()}`);
+      if (!planName) {
+        setIsSavingPlan(false);
+        return; // User cancelled
+      }
+
+      console.log('💾 Saving plan...');
+      console.log(`   Session ID: ${sessionId}`);
+      console.log(`   Screws: ${screws.length}`);
+
+      // Determine case ID to use
+      let effectiveCaseId = caseId;
+
+      if (!effectiveCaseId) {
+        // No case ID - inform user and create a default case
+        const userConfirmed = confirm(
+          '⚠️ No case is currently selected.\n\n' +
+          'This plan will be saved to a default case for now.\n\n' +
+          'You can organize cases properly later through the case management system.\n\n' +
+          'Continue?'
+        );
+
+        if (!userConfirmed) {
+          setIsSavingPlan(false);
+          return; // User cancelled
+        }
+
+        // Create a default case
+        console.log('🏥 Creating default case for plan...');
+        const caseResponse = await fetch('http://localhost:3001/api/cases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientInfo: {
+              mrn: 'DEFAULT-PATIENT',
+              name: 'Default Patient',
+              dateOfBirth: null
+            },
+            caseId: `DEFAULT-CASE-${Date.now()}`
+          })
+        });
+
+        if (!caseResponse.ok) {
+          throw new Error(`Failed to create default case: ${caseResponse.status}`);
+        }
+
+        const caseData = await caseResponse.json();
+        if (!caseData.success) {
+          throw new Error(`Case creation failed: ${caseData.error}`);
+        }
+
+        effectiveCaseId = caseData.caseId;
+        console.log(`✅ Created default case: ${effectiveCaseId}`);
+
+        // Update our local caseId state
+        setCaseId(effectiveCaseId);
+      }
+
+      const response = await fetch('http://localhost:3001/api/planning/plan/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          caseId: effectiveCaseId,
+          studyInstanceUID,
+          seriesInstanceUID,
+          planData: {
+            name: planName,
+            description: `Plan with ${screws.length} screws`,
+            surgeon
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('✅ Plan saved successfully:', data.plan_id);
+        alert(`Plan saved successfully!\nPlan ID: ${data.plan_id}`);
+      } else {
+        throw new Error(data.error || 'Failed to save plan');
+      }
+    } catch (error) {
+      console.error('❌ Error saving plan:', error);
+      alert(`Failed to save plan: ${error.message}`);
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  /**
+   * Load a saved plan
+   */
+  const loadPlan = async (planId: string) => {
+    try {
+      setIsLoading(true);
+      console.log('📥 Loading plan:', planId);
+
+      const response = await fetch(`http://localhost:3001/api/planning/plan/${planId}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load plan');
+      }
+
+      const plan = data.plan;
+      console.log('✅ Plan loaded:', plan);
+      console.log(`   Screws: ${plan.screws.length}`);
+      console.log(`   Rods: ${plan.rods.length}`);
+
+      // Update screws in UI
+      setScrews(plan.screws || []);
+
+      // TODO: Restore 3D models for each screw
+      // This would require iterating through plan.screws and calling loadScrewModel for each
+
+      alert(`Plan loaded successfully!\n${plan.name}\nScrews: ${plan.screws.length}\nRods: ${plan.rods.length}`);
+    } catch (error) {
+      console.error('❌ Error loading plan:', error);
+      alert(`Failed to load plan: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const exportToJSON = () => {
     try {
       if (screws.length === 0) {
@@ -833,20 +1051,21 @@ export default function ScrewManagementPanel({ servicesManager }) {
             🧪
           </button>
           <button
-            onClick={importFromJSON}
+            onClick={() => setShowPlanDialog(true)}
             className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-base"
-            title="Import Screw Placements"
+            title="Load Plan"
           >
-            📤
+            📂
           </button>
           {screws.length > 0 && (
             <>
               <button
-                onClick={exportToJSON}
-                className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-base"
-                title="Export All Screws"
+                onClick={savePlan}
+                disabled={isSavingPlan}
+                className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Save Plan"
               >
-                📥
+                {isSavingPlan ? '⏳' : '💾'}
               </button>
               <button
                 onClick={clearAllScrews}
@@ -859,6 +1078,15 @@ export default function ScrewManagementPanel({ servicesManager }) {
           )}
         </div>
       </div>
+
+      {/* Plan Selection Dialog */}
+      <PlanSelectionDialog
+        isOpen={showPlanDialog}
+        onClose={() => setShowPlanDialog(false)}
+        onSelectPlan={loadPlan}
+        caseId={caseId}
+        seriesInstanceUID={seriesInstanceUID}
+      />
 
       {/* Session Status Indicator */}
       {sessionStatus === 'initializing' && (

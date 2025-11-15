@@ -1,5 +1,6 @@
-const id = 'lifesync';
+import packageJson from '../package.json';
+
+const id = packageJson.name;
 
 export { id };
 export default id;
-

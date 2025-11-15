@@ -16,7 +16,7 @@ export const tracked = {
   thumbnailList: '@ohif/extension-measurement-tracking.panelModule.seriesList',
   viewport: '@ohif/extension-measurement-tracking.viewportModule.cornerstone-tracked',
   viewportState: '@ohif/extension-cornerstone.panelModule.viewport-state',
-  screwManagement: '@ohif/extension-cornerstone.panelModule.screw-management',
+  screwManagement: '@ohif/extension-lifesync.panelModule.screw-management',
   trackingPanel: '@ohif/extension-default.panelModule.trackingPanel',
   registrationPanel: '@ohif/extension-default.panelModule.registrationPanel',
 };
