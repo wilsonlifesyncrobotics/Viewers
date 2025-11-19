@@ -28,7 +28,6 @@ function AboutModalDefault() {
         <AboutModal.SocialItem
           icon="SocialGithub"
           url="OHIF/Viewers"
-          // url="lifesync-robotics/Viewers"
           text="github.com/OHIF/Viewers"
         />
       </AboutModal.Body>

@@ -844,9 +844,152 @@ function WorkList({
   const [addStudyToCaseId, setAddStudyToCaseId] = useState(null);
   const [orthancStudies, setOrthancStudies] = useState([]);
   const [loadingOrthancStudies, setLoadingOrthancStudies] = useState(false);
+  // add study modal state
+  const [activeTab, setActiveTab] = useState('upload'); // 'upload' or 'select'
+  // upload method state
+  const [uploadMethod, setUploadMethod] = useState('standard'); // 'standard' or 'custom'
+  // const [autoEnroll, setAutoEnroll] = useState(false);
+  // const [clinicalPhase, setClinicalPhase] = useState('PreOperativePlanning');
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [isUploading, setIsUploading] = useState(false);
+  // TODO: 搜索功能暂时注释，后续实现
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchFilter, setSearchFilter] = useState('studyUID'); // 'studyUID' | 'patientName' | 'mrn' | 'studyDate'
+  // Filter studies based on search query (placeholder - will implement later)
+  const filteredOrthancStudies = useMemo(() => {
+    // TODO: 实现搜索过滤逻辑
+    return orthancStudies;
+  }, [orthancStudies, searchQuery, searchFilter]);
+
+  // 暂时直接使用 orthancStudies，不进行过滤
+  // const filteredOrthancStudies = orthancStudies;
+
   const querying = useMemo(() => {
     return isLoadingData || expandedRows.length > 0;
   }, [isLoadingData, expandedRows]);
+
+  // Custom upload function using /api/dicom/studies/upload
+  const handleCustomUpload = useCallback(async () => {
+    if (selectedFiles.length === 0) {
+      alert('请选择至少一个文件');
+      return;
+    }
+
+    if (!caseService) {
+      alert('Case Service 未初始化');
+      return;
+    }
+
+    // Confirm before upload if auto-enroll is enabled
+    // if (autoEnroll && addStudyToCaseId) {
+    //   const confirmMessage =
+    //     `确认上传并注册到 Case？\n\n` +
+    //     `Case ID: ${addStudyToCaseId}\n` +
+    //     `临床阶段: ${clinicalPhase}\n` +
+    //     `文件数量: ${selectedFiles.length} 个\n\n` +
+    //     `上传完成后，study 将自动注册到该 Case。`;
+
+    //   if (!window.confirm(confirmMessage)) {
+    //     return; // User cancelled
+    //   }
+    // }
+
+    // Get API URL from localStorage or use default
+    const hostname = window.location.hostname;
+    const defaultApiUrl =
+      hostname === 'localhost' || hostname === '127.0.0.1'
+        ? 'http://localhost:3001'
+        : `http://${hostname}:3001`;
+    const apiUrl = localStorage.getItem('syncforge_api_url') || defaultApiUrl;
+    setIsUploading(true);
+    setUploadProgress({});
+
+    try {
+      const formData = new FormData();
+
+      // Add files
+      selectedFiles.forEach(file => {
+        formData.append('files', file);
+      });
+
+      // Add optional parameters if auto-enroll is enabled
+      // if (autoEnroll && addStudyToCaseId) {
+      //   formData.append('caseId', addStudyToCaseId.toString());
+      //   formData.append('clinicalPhase', clinicalPhase);
+      //   formData.append('autoEnroll', 'true');
+      // }
+
+      // Upload using fetch
+      const response = await fetch(`${apiUrl}/api/dicom/studies/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
+        throw new Error(errorData.error || `Upload failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Show success message
+        const message = `✅ 上传成功！${result.studiesUploaded} 个 study 已上传到 Orthanc`;
+        // const message =
+        //   autoEnroll && result.enrollmentResults
+        //     ? `✅ 上传并注册成功！${result.studiesUploaded} 个 study 已上传并注册到 Case`
+        //     : `✅ 上传成功！${result.studiesUploaded} 个 study 已上传到 Orthanc`;
+
+        alert(message);
+
+        // Refresh studies list
+        setLoadingOrthancStudies(true);
+        try {
+          const studies = await caseService.getAllOrthancStudies();
+          setOrthancStudies(studies);
+        } catch (err) {
+          console.error('Failed to reload Orthanc studies:', err);
+        } finally {
+          setLoadingOrthancStudies(false);
+        }
+
+        // Refresh page data
+        onRefresh();
+
+        // Clear selected files
+        setSelectedFiles([]);
+        setUploadProgress({});
+
+        // If auto-enrolled, close modal; otherwise, optionally switch to select tab
+        // if (autoEnroll && result.enrollmentResults) {
+        //   setShowAddStudyModal(false);
+        // } else {
+        //   // Optional: switch to select tab to see uploaded studies
+        //   // setActiveTab('select');
+        // }
+      } else {
+        throw new Error(result.error || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(`上传失败: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [selectedFiles, addStudyToCaseId, caseService, onRefresh]);
+  // }, [selectedFiles, autoEnroll, clinicalPhase, addStudyToCaseId, caseService, onRefresh]);
+
+  // Handle file selection
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setSelectedFiles(prev => [...prev, ...files]);
+  }, []);
+
+  // Handle file removal
+  const handleFileRemove = useCallback((index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
   const setFilterValues = val => {
     if (filterValues.pageNumber === val.pageNumber) {
@@ -976,6 +1119,11 @@ function WorkList({
 
     const queryString = {};
     Object.keys(defaultFilterValues).forEach(key => {
+      // 暂时排除 sortBy 和 sortDirection，避免触发 404 错误（服务器没有对应的 API）
+      if (key === 'sortBy' || key === 'sortDirection') {
+        return;
+      }
+
       const defaultValue = defaultFilterValues[key];
       const currValue = debouncedFilterValues[key];
 
@@ -1178,6 +1326,15 @@ function WorkList({
                       e.stopPropagation();
                       setAddStudyToCaseId(caseItem.caseId);
                       setShowAddStudyModal(true);
+                      setActiveTab('upload'); // Reset to upload tab
+                      // Reset upload-related state
+                      setUploadMethod('standard');
+                      // setAutoEnroll(false);
+                      // setClinicalPhase('PreOperativePlanning');
+                      setSelectedFiles([]);
+                      setUploadProgress({});
+                      setIsUploading(false);
+                      // setSearchQuery(''); // Reset search - TODO: 搜索功能暂时注释
                       setLoadingOrthancStudies(true);
 
                       try {
@@ -2006,7 +2163,8 @@ function WorkList({
       onClick: () =>
         show({
           content: AboutModal,
-          title: AboutModal?.title ?? t('AboutModal:About OHIF Viewer'),
+          // title: AboutModal?.title ?? t('AboutModal:About LifeSync Robotics'),
+          title: AboutModal?.title ?? 'About LifeSync Robotics',
           containerClassName: AboutModal?.containerClassName ?? 'max-w-md',
         }),
     },
@@ -2135,9 +2293,9 @@ function WorkList({
                 const clearedFilters = { ...defaultFilterValues };
                 setFilterValues(clearedFilters);
                 updateSessionQueryFilterValues(clearedFilters);
-                // 同时清空 URL 参数（保留必要的参数如 sortBy）
+                // 同时清空 URL 参数（暂时不包含 sortBy 和 sortDirection，避免 404 错误）
                 const newSearchParams = new URLSearchParams();
-                // 保留排序参数（如果有）
+                // TODO: 暂时注释掉排序参数的保留，避免触发 404 错误
                 if (filterValues.sortBy) {
                   newSearchParams.set('sortBy', filterValues.sortBy);
                 }
@@ -2206,102 +2364,434 @@ function WorkList({
                 <Icons.Close className="h-5 w-5 text-white" />
               </button>
             </div>
+            {/* Tab Navigation */}
+            <div className="border-secondary-light bg-primary-dark flex border-b px-6">
+              <button
+                className={classnames(
+                  'px-4 py-2 font-semibold transition-colors',
+                  activeTab === 'upload'
+                    ? 'bg-secondary-main border-b-2 border-blue-400 text-white'
+                    : 'text-gray-400 hover:text-white'
+                )}
+                onClick={() => setActiveTab('upload')}
+              >
+                Upload
+              </button>
+              <button
+                className={classnames(
+                  'px-4 py-2 font-semibold transition-colors',
+                  activeTab === 'select'
+                    ? 'bg-secondary-main border-b-2 border-blue-400 text-white'
+                    : 'text-gray-400 hover:text-white'
+                )}
+                onClick={() => setActiveTab('select')}
+              >
+                Select Study
+              </button>
+            </div>
 
             {/* Modal Body */}
-            <div className="max-h-[60vh] overflow-y-auto p-6">
-              {loadingOrthancStudies ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <div className="mb-4 text-white">Loading studies from Orthanc...</div>
-                    <div className="text-gray-400">Please wait</div>
+            <div className="max-h-[60vh] overflow-y-auto">
+              {activeTab === 'upload' && (
+                <div className="p-6">
+                  {/* Upload Method Selection */}
+                  <div className="mb-6">
+                    <label className="mb-3 block text-sm font-semibold text-white">
+                      上传方式：
+                    </label>
+                    <div className="space-y-2 rounded-lg border border-gray-700 bg-gray-900/50 p-4">
+                      <label className="flex cursor-pointer items-start gap-3">
+                        <input
+                          type="radio"
+                          name="uploadMethod"
+                          value="standard"
+                          checked={uploadMethod === 'standard'}
+                          onChange={e => setUploadMethod(e.target.value)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-white">DICOMweb STOW-RS</div>
+                          <div className="text-xs text-gray-400">
+                            DICOMweb STOW-RS, upload directly to Orthanc PACS
+                          </div>
+                        </div>
+                      </label>
+                      <label className="flex cursor-pointer items-start gap-3">
+                        <input
+                          type="radio"
+                          name="uploadMethod"
+                          value="custom"
+                          checked={uploadMethod === 'custom'}
+                          onChange={e => setUploadMethod(e.target.value)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-white">Custom Upload</div>
+                          <div className="text-xs text-gray-400">
+                            Batch upload via custom API endpoint
+                          </div>
+                        </div>
+                      </label>
+                    </div>
                   </div>
-                </div>
-              ) : orthancStudies.length === 0 ? (
-                <div className="py-12 text-center text-gray-400">No studies found in Orthanc</div>
-              ) : (
-                <div className="space-y-2">
-                  {orthancStudies.map(study => (
-                    <div
-                      key={study.studyInstanceUID}
-                      className={classnames(
-                        'hover:bg-secondary-dark flex items-center justify-between rounded border p-4 transition-colors',
-                        {
-                          'border-yellow-500/50 bg-yellow-900/20': study.hasCaseId,
-                          'bg-secondary-main cursor-pointer border-gray-700': !study.hasCaseId,
-                        }
-                      )}
-                      onClick={async () => {
-                        if (study.hasCaseId) {
-                          const confirmAdd = window.confirm(
-                            `⚠️ WARNING: This study is already assigned to case "${study.existingCaseId}".\n\nDo you want to add it to "${addStudyToCaseId}" anyway?`
-                          );
-                          if (!confirmAdd) {
-                            return;
-                          }
-                        }
 
-                        // Prompt for clinical phase
-                        const phase = window.prompt(
-                          'Enter clinical phase:\n\n1. PreOperativePlanning\n2. IntraOperative\n3. PostOperative\n4. FollowUp\n\nEnter number (1-4):',
-                          '1'
-                        );
-
-                        const phaseMap = {
-                          '1': 'PreOperativePlanning',
-                          '2': 'IntraOperative',
-                          '3': 'PostOperative',
-                          '4': 'FollowUp',
-                        };
-
-                        const clinicalPhase = phaseMap[phase] || 'PreOperativePlanning';
-
+                  {/* Standard Upload */}
+                  {uploadMethod === 'standard' &&
+                  DicomUploadComponent &&
+                  dataSource.getConfig()?.dicomUploadEnabled ? (
+                    <DicomUploadComponent
+                      dataSource={dataSource}
+                      onComplete={async () => {
+                        // 上传完成后，刷新 Orthanc studies 列表
+                        setLoadingOrthancStudies(true);
                         try {
-                          if (caseService && addStudyToCaseId) {
-                            await caseService.enrollStudy(
-                              addStudyToCaseId,
-                              study.studyInstanceUID,
-                              clinicalPhase
-                            );
-                            console.log(`✅ Study added to case ${addStudyToCaseId}`);
-                            setShowAddStudyModal(false);
-                            window.location.reload();
+                          if (caseService) {
+                            const studies = await caseService.getAllOrthancStudies();
+                            setOrthancStudies(studies);
+                            // 可选：自动切换到 Select Study 标签页
+                            // setActiveTab('select');
                           }
+                          // 刷新页面数据
+                          onRefresh();
                         } catch (err) {
-                          console.error('Failed to add study:', err);
-                          alert('Failed to add study to case: ' + err.message);
+                          console.error('Failed to reload Orthanc studies:', err);
+                        } finally {
+                          setLoadingOrthancStudies(false);
                         }
                       }}
-                    >
-                      <div className="flex-1">
-                        <div className="mb-1 flex items-center gap-2">
-                          <span className="font-semibold text-white">
-                            {study.patientName || 'Unknown'}
-                          </span>
-                          {study.hasCaseId && (
-                            <span className="rounded border border-yellow-500 bg-yellow-900/40 px-2 py-0.5 text-xs text-yellow-300">
-                              ⚠️ Case: {study.existingCaseId}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-400">
-                          <span className="mr-4">MRN: {study.patientId || 'N/A'}</span>
-                          <span className="mr-4">Date: {study.studyDate || 'N/A'}</span>
-                          <span className="mr-4">Modality: {study.modalities || 'N/A'}</span>
-                          <span>Series: {study.seriesCount}</span>
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {study.studyDescription || 'No description'}
-                        </div>
-                      </div>
-                      <div>
-                        {study.hasCaseId ? (
-                          <span className="text-xs text-yellow-400">Click to override</span>
-                        ) : (
-                          <Icons.Add className="h-6 w-6 text-green-400" />
-                        )}
+                      onStarted={() => {
+                        // 上传开始时，可以显示加载状态
+                        console.log('Upload started');
+                      }}
+                    />
+                  ) : uploadMethod === 'standard' ? (
+                    <div className="flex h-[400px] items-center justify-center rounded-lg border-2 border-dashed border-gray-600">
+                      <div className="text-center text-gray-400">
+                        <p className="mb-2 text-lg">Upload DICOM Files</p>
+                        <p className="text-sm">DICOM upload is not enabled</p>
                       </div>
                     </div>
-                  ))}
+                  ) : null}
+
+                  {/* Custom Upload */}
+                  {uploadMethod === 'custom' && (
+                    <div className="space-y-4">
+                      {/* File Selection */}
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-white">
+                          Select Files:
+                        </label>
+                        <div className="rounded-lg border-2 border-dashed border-gray-600 bg-gray-900/30 p-8 text-center">
+                          <input
+                            type="file"
+                            multiple
+                            accept=".dcm,application/dicom"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                            id="file-upload-input"
+                            disabled={isUploading}
+                          />
+                          <input
+                            type="file"
+                            // @ts-ignore - webkitdirectory is a valid HTML attribute but not in React types
+                            webkitdirectory=""
+                            multiple
+                            onChange={handleFileSelect}
+                            className="hidden"
+                            id="folder-upload-input"
+                            disabled={isUploading}
+                          />
+                          <div className="mb-4">
+                            <div className="mb-2 text-4xl">📁</div>
+                            <div className="mb-2 text-white">
+                              Drag files here or click to select
+                            </div>
+                            <div className="mb-4 text-sm text-gray-400">
+                              Supports multiple file upload, format: .dcm
+                            </div>
+                            <div className="flex justify-center gap-3">
+                              <label
+                                htmlFor="file-upload-input"
+                                className="cursor-pointer rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Add Files
+                              </label>
+                              <label
+                                htmlFor="folder-upload-input"
+                                className="cursor-pointer rounded bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                Add Folder
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Selected Files List */}
+                        {selectedFiles.length > 0 && (
+                          <div className="mt-4 rounded-lg border border-gray-700 bg-gray-900/50 p-4">
+                            <div className="mb-2 text-sm font-semibold text-white">
+                              Selected Files ({selectedFiles.length}):
+                            </div>
+                            <div className="max-h-40 space-y-2 overflow-y-auto">
+                              {selectedFiles.map((file, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between rounded bg-gray-800/50 px-3 py-2"
+                                >
+                                  <span className="text-sm text-gray-300">{file.name}</span>
+                                  <button
+                                    onClick={() => handleFileRemove(index)}
+                                    className="text-red-400 hover:text-red-300"
+                                    disabled={isUploading}
+                                  >
+                                    <Icons.Close className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Custom Upload Options */}
+                      {/* 自动注册功能已注释
+                      <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-4">
+                        <label className="mb-3 flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={autoEnroll}
+                            onChange={e => setAutoEnroll(e.target.checked)}
+                            className="rounded"
+                            disabled={isUploading}
+                          />
+                          <span className="font-semibold text-white">自动注册到当前 Case</span>
+                        </label>
+                        {autoEnroll && (
+                          <div className="mt-3 space-y-3">
+                            <div>
+                              <label className="mb-2 block text-sm text-gray-300">临床阶段：</label>
+                              <select
+                                value={clinicalPhase}
+                                onChange={e => setClinicalPhase(e.target.value)}
+                                className="w-full rounded border border-gray-600 bg-black px-3 py-2 text-white"
+                                disabled={isUploading}
+                              >
+                                <option value="Diagnostic">Diagnostic</option>
+                                <option value="PreSurgicalOptimization">
+                                  PreSurgicalOptimization
+                                </option>
+                                <option value="PreOperativePlanning">PreOperativePlanning</option>
+                                <option value="PreOperativeCheck">PreOperativeCheck</option>
+                                <option value="IntraOperative">IntraOperative</option>
+                                <option value="PostOperativeImmediate">
+                                  PostOperativeImmediate
+                                </option>
+                                <option value="PostOperativeShortTerm">
+                                  PostOperativeShortTerm
+                                </option>
+                                <option value="PostOperativeLongTerm">PostOperativeLongTerm</option>
+                                <option value="Surveillance">Surveillance</option>
+                                <option value="Revision">Revision</option>
+                              </select>
+                            </div>
+                            {addStudyToCaseId && (
+                              <div className="rounded border border-blue-500/30 bg-blue-900/20 p-3">
+                                <div className="text-sm text-blue-300">
+                                  <span className="font-semibold">将注册到 Case ID:</span>{' '}
+                                  <span className="font-mono text-blue-200">
+                                    {addStudyToCaseId}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            <p className="text-xs text-gray-400">
+                              勾选后，上传完成后会自动将 study 注册到当前 case
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      */}
+
+                      {/* Upload Button */}
+                      <div className="flex justify-end gap-3">
+                        <button
+                          onClick={() => {
+                            setSelectedFiles([]);
+                            setUploadProgress({});
+                          }}
+                          className="rounded border border-gray-600 bg-gray-800 px-4 py-2 text-white hover:bg-gray-700"
+                          disabled={isUploading || selectedFiles.length === 0}
+                        >
+                          Clear
+                        </button>
+                        <button
+                          onClick={handleCustomUpload}
+                          disabled={isUploading || selectedFiles.length === 0}
+                          className={classnames(
+                            'rounded px-4 py-2 font-semibold text-white transition-colors',
+                            isUploading || selectedFiles.length === 0
+                              ? 'cursor-not-allowed bg-gray-600'
+                              : 'bg-blue-600 hover:bg-blue-700'
+                          )}
+                        >
+                          {isUploading ? 'Uploading...' : 'Start Upload'}
+                        </button>
+                      </div>
+
+                      {/* Upload Progress */}
+                      {isUploading && (
+                        <div className="rounded-lg border border-blue-500/50 bg-blue-900/20 p-4">
+                          <div className="mb-2 text-sm text-blue-300">上传中，请稍候...</div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-700">
+                            <div
+                              className="h-full animate-pulse bg-blue-500"
+                              style={{ width: '50%' }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'select' && (
+                <div>
+                  {/* Search Bar - TODO: 搜索功能暂时注释，后续实现 */}
+                  {/* <div className="border-secondary-light bg-secondary-main flex items-center gap-3 border-b p-4">
+                    <select
+                      value={searchFilter}
+                      onChange={e => setSearchFilter(e.target.value)}
+                      className="w-40 rounded border border-gray-600 bg-black px-3 py-2 text-white"
+                    >
+                      <option value="studyUID">StudyUID</option>
+                      <option value="patientName">Patient Name</option>
+                      <option value="mrn">MRN</option>
+                      <option value="studyDate">Study Date</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="Enter search term..."
+                      className="flex-1 rounded border border-gray-600 bg-black px-3 py-2 text-white placeholder-gray-500"
+                    />
+                    <button
+                      onClick={() => {
+                        // TODO: 实现搜索功能
+                        console.log('Search clicked:', searchQuery, searchFilter);
+                      }}
+                      className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                    >
+                      Search
+                    </button>
+                  </div> */}
+
+                  {/* Study List */}
+                  <div className="p-6">
+                    {loadingOrthancStudies ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="text-center">
+                          <div className="mb-4 text-white">Loading studies from Orthanc...</div>
+                          <div className="text-gray-400">Please wait</div>
+                        </div>
+                      </div>
+                    ) : filteredOrthancStudies.length === 0 ? (
+                      <div className="py-12 text-center text-gray-400">
+                        No studies found in Orthanc
+                        {/* {searchQuery
+                          ? 'No studies found matching your search'
+                          : 'No studies found in Orthanc'} */}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredOrthancStudies.map(study => (
+                          <div
+                            key={study.studyInstanceUID}
+                            className={classnames(
+                              'hover:bg-secondary-dark flex items-center justify-between rounded border p-4 transition-colors',
+                              {
+                                'border-yellow-500/50 bg-yellow-900/20': study.hasCaseId,
+                                'bg-secondary-main cursor-pointer border-gray-700':
+                                  !study.hasCaseId,
+                              }
+                            )}
+                            onClick={async () => {
+                              // TODO: 保持原有的点击逻辑
+                              if (study.hasCaseId) {
+                                const confirmAdd = window.confirm(
+                                  `⚠️ WARNING: This study is already assigned to case "${study.existingCaseId}".\n\nDo you want to add it to "${addStudyToCaseId}" anyway?`
+                                );
+                                if (!confirmAdd) {
+                                  return;
+                                }
+                              }
+
+                              // Prompt for clinical phase
+                              const phase = window.prompt(
+                                'Enter clinical phase:\n\n1. PreOperativePlanning\n2. IntraOperative\n3. PostOperative\n4. FollowUp\n\nEnter number (1-4):',
+                                '1'
+                              );
+
+                              const phaseMap = {
+                                '1': 'PreOperativePlanning',
+                                '2': 'IntraOperative',
+                                '3': 'PostOperative',
+                                '4': 'FollowUp',
+                              };
+
+                              const clinicalPhase = phaseMap[phase] || 'PreOperativePlanning';
+
+                              try {
+                                if (caseService && addStudyToCaseId) {
+                                  await caseService.enrollStudy(
+                                    addStudyToCaseId,
+                                    study.studyInstanceUID,
+                                    clinicalPhase
+                                  );
+                                  console.log(`✅ Study added to case ${addStudyToCaseId}`);
+                                  setShowAddStudyModal(false);
+                                  window.location.reload();
+                                }
+                              } catch (err) {
+                                console.error('Failed to add study:', err);
+                                alert('Failed to add study to case: ' + err.message);
+                              }
+                            }}
+                          >
+                            <div className="flex-1">
+                              <div className="mb-1 flex items-center gap-2">
+                                <span className="font-semibold text-white">
+                                  {study.patientName || 'Unknown'}
+                                </span>
+                                {study.hasCaseId && (
+                                  <span className="rounded border border-yellow-500 bg-yellow-900/40 px-2 py-0.5 text-xs text-yellow-300">
+                                    ⚠️ Case: {study.existingCaseId}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-400">
+                                <span className="mr-4">MRN: {study.patientId || 'N/A'}</span>
+                                <span className="mr-4">Date: {study.studyDate || 'N/A'}</span>
+                                <span className="mr-4">Modality: {study.modalities || 'N/A'}</span>
+                                <span>Series: {study.seriesCount}</span>
+                              </div>
+                              <div className="mt-1 text-xs text-gray-500">
+                                {study.studyDescription || 'No description'}
+                              </div>
+                            </div>
+                            <div>
+                              {study.hasCaseId ? (
+                                <span className="text-xs text-yellow-400">Click to override</span>
+                              ) : (
+                                <Icons.Add className="h-6 w-6 text-green-400" />
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -2310,7 +2800,15 @@ function WorkList({
             <div className="border-secondary-light border-t px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-400">
-                  {orthancStudies.length} studies available
+                  {/* {orthancStudies.length} studies available */}
+                  {activeTab === 'select'
+                    ? `${orthancStudies.length} studies available`
+                    : `${orthancStudies.length} studies available`}
+                  {/* TODO: 搜索功能暂时注释
+                  {activeTab === 'select'
+                    ? `${filteredOrthancStudies.length} of ${orthancStudies.length} studies`
+                    : `${orthancStudies.length} studies available`}
+                  */}
                   {orthancStudies.filter(s => s.hasCaseId).length > 0 && (
                     <span className="ml-2 text-yellow-400">
                       ({orthancStudies.filter(s => s.hasCaseId).length} already assigned)
