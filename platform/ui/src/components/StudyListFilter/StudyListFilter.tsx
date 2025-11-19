@@ -16,7 +16,6 @@ const StudyListFilter = ({
   numOfStudies,
   onUploadClick,
   getDataSourceConfigurationComponent,
-  countLabel,
 }) => {
   const { t } = useTranslation('StudyList');
   const { sortBy, sortDirection } = filterValues;
@@ -37,11 +36,10 @@ const StudyListFilter = ({
             <div className="mb-5 flex flex-row justify-between">
               <div className="flex min-w-[1px] shrink flex-row items-center gap-6">
                 <Typography
-                  component="span"
                   variant="h6"
                   className="text-white"
                 >
-                  {t('Case List')}
+                  {t('StudyList')}
                 </Typography>
                 {getDataSourceConfigurationComponent && getDataSourceConfigurationComponent()}
                 {onUploadClick && (
@@ -50,7 +48,7 @@ const StudyListFilter = ({
                     onClick={onUploadClick}
                   >
                     <Icons.Upload />
-                    <span>{t('Upload DICOM Files')}</span>
+                    <span>{t('Upload')}</span>
                   </div>
                 )}
               </div>
@@ -65,15 +63,12 @@ const StudyListFilter = ({
                     className="mx-8"
                     startIcon={<Icons.Cancel />}
                     onClick={clearFilters}
-                    endIcon={null}
-                    name="clear-filters"
                   >
                     {t('ClearFilters')}
                   </LegacyButton>
                 )}
 
                 <Typography
-                  component="span"
                   variant="h6"
                   className="mr-2"
                   data-cy={'num-studies'}
@@ -81,11 +76,10 @@ const StudyListFilter = ({
                   {numOfStudies > 100 ? '>100' : numOfStudies}
                 </Typography>
                 <Typography
-                  component="span"
                   variant="h6"
                   className="text-primary-light"
                 >
-                  {`${countLabel || t('Studies')} `}
+                  {`${t('Studies')} `}
                 </Typography>
               </div>
             </div>
@@ -145,7 +139,6 @@ StudyListFilter.propTypes = {
   isFiltering: PropTypes.bool.isRequired,
   onUploadClick: PropTypes.func,
   getDataSourceConfigurationComponent: PropTypes.func,
-  countLabel: PropTypes.string,
 };
 
 export default StudyListFilter;

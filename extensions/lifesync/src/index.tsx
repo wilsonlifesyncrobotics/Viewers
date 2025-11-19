@@ -1,6 +1,5 @@
 import getPanelModule from './panels/getPanelModule';
 import getToolbarModule from './tools/getToolbarModule';
-import getCustomizationModule from './getCustomizationModule';
 import { id } from './id.js';
 
 // Export services for use by other extensions
@@ -15,7 +14,6 @@ const lifesyncExtension = {
 
   getPanelModule,
   getToolbarModule,
-  getCustomizationModule,
 
   /**
    * Service configuration

@@ -12,7 +12,7 @@ function AboutModalDefault() {
 
   return (
     <AboutModal className="w-[400px]">
-      <AboutModal.ProductName>LifeSync Robotics</AboutModal.ProductName>
+      <AboutModal.ProductName>OHIF Viewer</AboutModal.ProductName>
       <AboutModal.ProductVersion>{main}</AboutModal.ProductVersion>
       {beta && <AboutModal.ProductBeta>{beta}</AboutModal.ProductBeta>}
 
@@ -28,7 +28,6 @@ function AboutModalDefault() {
         <AboutModal.SocialItem
           icon="SocialGithub"
           url="OHIF/Viewers"
-          // url="lifesync-robotics/Viewers"
           text="github.com/OHIF/Viewers"
         />
       </AboutModal.Body>
